@@ -4,8 +4,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(_DEBUG)
 endif()
 
-project(template)
-add_executable(${PROJECT_NAME} main.cpp)
+project(marievm)
+add_executable(${PROJECT_NAME} src/main.cpp)
 
 include(cmake/CPM.cmake)
 
