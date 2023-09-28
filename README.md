@@ -1,6 +1,6 @@
-# cpp_template
+# MARIE 
 
-template for cpp projects
+A MARIE virtual machine
 
 has various presets that can be used with cmake --preset=config
 example:
@@ -13,7 +13,3 @@ using cpm as a package manager
 
 # clang format/tidy
 copied the clang format and tidy files from lefticus's cmake preset github page, made some slight modifications like tab sizes
-usage:
-
-clang-tidy -p build/debug main.cpp
-clang-format main.cpp
