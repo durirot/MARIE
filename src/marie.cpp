@@ -75,22 +75,31 @@ void Marie::execInstr(std::tuple<Instruction, word>& instr)
     switch (std::get<0>(instr)) {
     case Instruction::Load:
 		AC = memoryAtAddress(std::get<1>(instr));
+		break;
     case Instruction::Store:
 		storeAtAddress(std::get<1>(instr));
+		break;
     case Instruction::Add:
 		AC = AC + memoryAtAddress(std::get<1>(instr));
+		break;
     case Instruction::Subt:
 		AC = AC - memoryAtAddress(std::get<1>(instr));
+		break;
     case Instruction::Input:
 		AC = getchar();
+		break;
     case Instruction::Output:
 		fmt::print("{}", AC);
+		break;
     case Instruction::Halt:
 		halt = true;
+		break;
     case Instruction::Skipcond:
         skipNext = true;
+		break;
     case Instruction::Jump:
 		PC = std::get<1>(instr);
+		break;
     default:
         fmt::print("Invalid instruction {}", (int)std::get<0>(instr));
     }
