@@ -5,34 +5,51 @@
 #include <tuple>
 
 enum struct Instruction {
-    Load,
+    Load = 1,
     Store,
     Add,
-    Sub,
+    Subt,
+
+    Input,
+    Output,
+    Halt,
+    Skipcond,
+    Jump,
 };
 
 struct Marie {
-    Marie(byte* image);
+    Marie(byte* image, size_t imageSize);
 
     word run();
-    std::tuple<Instruction, word> decode();
+    std::tuple<Instruction, word> decode(word instr);
+    void execInstr(std::tuple<Instruction, word>& instr);
 
 private:
-    byte memory[4096];
+    static constexpr size_t MaxMemory = 4096 * sizeof(byte);
+    byte memory[MaxMemory] {};
 
-    byte* image;
+    word AC {}; // Accumulator
+    word MAR {}; // Memory Address Register
+    word MBR {}; // Memory Buffer Register
+    word PC {}; // Program Counter
+    word IR {}; // Instruction Register (holds the next expression to be executed)
+    word InREG {}; //  Input Register (holds data from the input device)
 
-    word AC; // Accumulator
-    word MAR; // Memory Address Register
-    word MBR; // Memory Buffer Register
-    word PC; // Program Counter
-    word IR; // Instruction Register (holds the next expression to be executed)
-    word InREG; //  Input Register (holds data from the input device)
+    bool skipNext = false;
+    bool errors = false;
+	bool halt = false;
+
+    word memoryAtAddress(word address);
+	void storeAtAddress(word address);
 };
 
-Marie::Marie(byte* image)
-    : image(image)
+Marie::Marie(byte* image, size_t imageSize)
 {
+    if (imageSize > MaxMemory) {
+        fmt::print("Warning, an image size of {} is larger than MARIE's max memory of {} bytes\n", imageSize, MaxMemory);
+        imageSize = MaxMemory;
+    }
+    memcpy(memory, image, imageSize * sizeof(byte));
 }
 
 word Marie::run()
@@ -40,8 +57,61 @@ word Marie::run()
     return 0;
 }
 
-std::tuple<Instruction, word> Marie::decode()
+std::tuple<Instruction, word> Marie::decode(word instr)
 {
+    std::tuple<Instruction, word> val;
+    std::get<0>(val) = (Instruction)(instr >> 12 & 0xF);
+    std::get<1>(val) = (word)(instr & 0xFFF0);
+    return val;
+}
+
+void Marie::execInstr(std::tuple<Instruction, word>& instr)
+{
+    if (skipNext) {
+        skipNext = false;
+        return;
+    }
+
+    switch (std::get<0>(instr)) {
+    case Instruction::Load:
+		AC = memoryAtAddress(std::get<1>(instr));
+    case Instruction::Store:
+		storeAtAddress(std::get<1>(instr));
+    case Instruction::Add:
+		AC = AC + memoryAtAddress(std::get<1>(instr));
+    case Instruction::Subt:
+		AC = AC - memoryAtAddress(std::get<1>(instr));
+    case Instruction::Input:
+		AC = getchar();
+    case Instruction::Output:
+		fmt::print("{}", AC);
+    case Instruction::Halt:
+		halt = true;
+    case Instruction::Skipcond:
+        skipNext = true;
+    case Instruction::Jump:
+		PC = std::get<1>(instr);
+    default:
+        fmt::print("Invalid instruction {}", (int)std::get<0>(instr));
+    }
+}
+
+word Marie::memoryAtAddress(word address)
+{
+    if (address < MaxMemory) {
+        fmt::print("attempting to address outside of memory, returning 0\n");
+        return 0;
+    }
+    return *(memory + address);
+}
+
+void Marie::storeAtAddress(word address)
+{
+    if (address < MaxMemory) {
+        fmt::print("attempting to address outside of memory, doing nothing\n");
+        return;
+    }
+    *(memory + address) = AC;
 }
 
 word marieLoad(const char* file)
@@ -64,7 +134,7 @@ word marieLoad(const char* file)
     (void)fread(data, size, 1, handle);
     fclose(handle);
 
-    Marie vm(data);
+    Marie vm(data, size);
 
     word result = vm.run();
 
