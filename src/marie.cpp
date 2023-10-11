@@ -21,11 +21,11 @@ struct Marie {
     Marie(byte* image, size_t imageSize);
 
     word run();
-    std::tuple<Instruction, word> decode(word instr);
-    void execInstr(std::tuple<Instruction, word>& instr);
+    std::pair<Instruction, word> decode(word instr);
+    void execInstr(std::pair<Instruction, word>& instr);
 
 private:
-    static constexpr size_t MaxMemory = 4096 * sizeof(byte);
+    static constexpr size_t MaxMemory = 4096 * sizeof(word);
     byte memory[MaxMemory] {};
 
     word AC {}; // Accumulator
@@ -37,10 +37,10 @@ private:
 
     bool skipNext = false;
     bool errors = false;
-	bool halt = false;
+    bool halt = false;
 
     word memoryAtAddress(word address);
-	void storeAtAddress(word address);
+    void storeAtAddress(word address);
 };
 
 Marie::Marie(byte* image, size_t imageSize)
@@ -54,54 +54,62 @@ Marie::Marie(byte* image, size_t imageSize)
 
 word Marie::run()
 {
-    return 0;
+	PC = memoryAtAddress(0);
+
+	while (halt != true) {
+		auto instr = decode(memoryAtAddress(PC));
+		PC += 1;
+		execInstr(instr);
+	}
+
+    return AC;
 }
 
-std::tuple<Instruction, word> Marie::decode(word instr)
+std::pair<Instruction, word> Marie::decode(word instr)
 {
-    std::tuple<Instruction, word> val;
-    std::get<0>(val) = (Instruction)(instr >> 12 & 0xF);
-    std::get<1>(val) = (word)(instr & 0xFFF0);
+    std::pair<Instruction, word> val;
+    val.first = (Instruction)(instr >> 12 & 0xF);
+    val.second = (word)(instr & 0xFFF0);
     return val;
 }
 
-void Marie::execInstr(std::tuple<Instruction, word>& instr)
+void Marie::execInstr(std::pair<Instruction, word>& instr)
 {
     if (skipNext) {
         skipNext = false;
         return;
     }
 
-    switch (std::get<0>(instr)) {
+    switch (instr.first) {
     case Instruction::Load:
-		AC = memoryAtAddress(std::get<1>(instr));
-		break;
+        AC = memoryAtAddress(instr.second);
+        break;
     case Instruction::Store:
-		storeAtAddress(std::get<1>(instr));
-		break;
+        storeAtAddress(instr.second);
+        break;
     case Instruction::Add:
-		AC = AC + memoryAtAddress(std::get<1>(instr));
-		break;
+        AC = AC + memoryAtAddress(instr.second);
+        break;
     case Instruction::Subt:
-		AC = AC - memoryAtAddress(std::get<1>(instr));
-		break;
+        AC = AC - memoryAtAddress(instr.second);
+        break;
     case Instruction::Input:
-		AC = getchar();
-		break;
+        AC = getchar();
+        break;
     case Instruction::Output:
-		fmt::print("{}", AC);
-		break;
+        fmt::print("{}", AC);
+        break;
     case Instruction::Halt:
-		halt = true;
-		break;
+        halt = true;
+        break;
     case Instruction::Skipcond:
         skipNext = true;
-		break;
+        break;
     case Instruction::Jump:
-		PC = std::get<1>(instr);
-		break;
+        PC = instr.second;
+        break;
     default:
-        fmt::print("Invalid instruction {}", (int)std::get<0>(instr));
+        fmt::print("Invalid instruction {}", (int)instr.first);
     }
 }
 
@@ -111,7 +119,7 @@ word Marie::memoryAtAddress(word address)
         fmt::print("attempting to address outside of memory, returning 0\n");
         return 0;
     }
-    return *(memory + address);
+    return *(memory + (address * sizeof(word)));
 }
 
 void Marie::storeAtAddress(word address)
@@ -120,7 +128,7 @@ void Marie::storeAtAddress(word address)
         fmt::print("attempting to address outside of memory, doing nothing\n");
         return;
     }
-    *(memory + address) = AC;
+    *(memory + (address * sizeof(word))) = AC;
 }
 
 word marieLoad(const char* file)
