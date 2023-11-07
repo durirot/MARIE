@@ -4,56 +4,45 @@
 #include <fmt/core.h>
 #include <tuple>
 
-enum struct Instruction {
-    Load = 1,
-    Store,
-    Add,
-    Subt,
-
-    Input,
-    Output,
-    Halt,
-    Skipcond,
-    Jump,
-};
+#include "instructions.h"
 
 struct Marie {
-    Marie(byte* image, size_t imageSize);
+    Marie(Byte* image, size_t imageSize);
 
-    word run();
-    std::pair<Instruction, word> decode(word instr);
-    void execInstr(std::pair<Instruction, word>& instr);
+    Word run();
+    std::pair<Instruction, Word> decode(Word instr);
+    void execInstr(std::pair<Instruction, Word>& instr);
 
 private:
-    static constexpr size_t MaxMemory = 4096 * sizeof(word);
-    byte memory[MaxMemory] {};
+    static constexpr size_t MaxMemory = 4096 * sizeof(Word);
+    Byte memory[MaxMemory] {};
 
-    word AC {}; // Accumulator
-    word MAR {}; // Memory Address Register
-    word MBR {}; // Memory Buffer Register
-    word PC {}; // Program Counter
-    word IR {}; // Instruction Register (holds the next expression to be executed)
-    word InREG {}; //  Input Register (holds data from the input device)
+    Word AC {}; // Accumulator
+    // Word MAR {}; // Memory Address Register
+    // Word MBR {}; // Memory Buffer Register
+    Word PC {}; // Program Counter
+    // Word IR {}; // Instruction Register (holds the next expression to be executed)
+    // Word InREG {}; //  Input Register (holds data from the input device)
 
     bool skipNext = false;
     bool errors = false;
     bool halt = false;
 
-    word memoryAtAddress(word address);
-    void storeAtAddress(word address);
-    bool skipCond(word condition);
+    Word memoryAtAddress(Word address);
+    void storeAtAddress(Word address);
+    bool skipCond(Word condition);
 };
 
-Marie::Marie(byte* image, size_t imageSize)
+Marie::Marie(Byte* image, size_t imageSize)
 {
     if (imageSize > MaxMemory) {
-        fmt::print("Warning, an image size of {} is larger than MARIE's max memory of {} bytes\n", imageSize, MaxMemory);
+        fmt::print("Warning, an image size of {} is larger than MARIE's max memory of {} Bytes\n", imageSize, MaxMemory);
         imageSize = MaxMemory;
     }
-    memcpy(memory, image, imageSize * sizeof(byte));
+    memcpy(memory, image, imageSize * sizeof(Byte));
 }
 
-word Marie::run()
+Word Marie::run()
 {
     PC = memoryAtAddress(0);
 
@@ -66,15 +55,15 @@ word Marie::run()
     return AC;
 }
 
-std::pair<Instruction, word> Marie::decode(word instr)
+std::pair<Instruction, Word> Marie::decode(Word instr)
 {
-    std::pair<Instruction, word> val;
+    std::pair<Instruction, Word> val;
     val.first = (Instruction)(instr >> 12 & 0xF);
-    val.second = (word)(instr & 0xFFF0);
+    val.second = (Word)(instr & 0xFFF0);
     return val;
 }
 
-void Marie::execInstr(std::pair<Instruction, word>& instr)
+void Marie::execInstr(std::pair<Instruction, Word>& instr)
 {
     if (skipNext) {
         skipNext = false;
@@ -114,25 +103,25 @@ void Marie::execInstr(std::pair<Instruction, word>& instr)
     }
 }
 
-word Marie::memoryAtAddress(word address)
+Word Marie::memoryAtAddress(Word address)
 {
     if (address < MaxMemory) {
         fmt::print("attempting to address outside of memory, returning 0\n");
         return 0;
     }
-    return *(memory + (address * sizeof(word)));
+    return *(memory + (address * sizeof(Word)));
 }
 
-void Marie::storeAtAddress(word address)
+void Marie::storeAtAddress(Word address)
 {
     if (address < MaxMemory) {
         fmt::print("attempting to address outside of memory, doing nothing\n");
         return;
     }
-    *(memory + (address * sizeof(word))) = AC;
+    *(memory + (address * sizeof(Word))) = AC;
 }
 
-bool Marie::skipCond(word condition)
+bool Marie::skipCond(Word condition)
 {
     condition = condition & 0x0C00;
 
@@ -147,7 +136,7 @@ bool Marie::skipCond(word condition)
     return false;
 }
 
-word marieLoad(const char* file)
+Word marieLoad(const char* file)
 {
     FILE* handle = fopen(file, "rb");
     if (handle == nullptr) {
@@ -158,18 +147,18 @@ word marieLoad(const char* file)
     size_t size = ftell(handle);
     fseek(handle, 0, SEEK_SET);
 
-    byte* data = (byte*)malloc(size * sizeof(byte));
+    Byte* data = (Byte*)malloc(size * sizeof(Byte));
     if (data == nullptr) {
         fmt::print("Failed to allocate memory for file {}\n", file);
         return -2;
     }
 
     (void)fread(data, size, 1, handle);
-    fclose(handle);
+    (void)fclose(handle);
 
     Marie vm(data, size);
 
-    word result = vm.run();
+    Word result = vm.run();
 
     free(data);
     return result;

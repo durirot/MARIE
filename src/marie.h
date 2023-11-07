@@ -1,8 +1,6 @@
 #pragma once
 
-#include <stdint.h>
+#include "common.h"
 
-typedef uint8_t byte;
-typedef uint16_t word;
-
-word marieLoad(const char* file);
+// expects the first word to be the pc start location
+Word marieLoad(const char* file);
