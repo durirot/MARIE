@@ -3,14 +3,28 @@
 #include "instructions.h"
 #include "static_hashtable.hpp"
 
+#include <charconv>
+#include <deque>
+#include <fmt/core.h>
+#include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 
 enum struct DataType {
     Identifier,
+    Opcode, // 12 bits
     Word,
     None,
     Eof,
 };
+
+constexpr Word maxOpcodeSize()
+{
+    Word value = 2;
+    for (int i = 0; i < 11; i++)
+        value *= 2;
+    return value;
+}
 
 struct InstructionData {
     Instruction instr;
@@ -35,19 +49,43 @@ enum struct Token {
     Skipcond,
     Jump,
 
+    Comma,
+    Unknown,
+
     Eof,
 };
+
+bool tokenIsInstruction(Token tok)
+{
+    return ((int)tok >= (int)Token::Load && (int)tok <= (int)Token::Jump);
+}
+
+Instruction tokenToInstruction(Token tok)
+{
+    if (!tokenIsInstruction(tok))
+        throw std::runtime_error("token is not an instruction");
+
+    constexpr std::size_t offset = (int)Token::Load - (int)Instruction::Load;
+
+    return (Instruction)((int)tok - offset);
+}
 
 struct Lexer {
     Lexer(std::string_view text);
 
     std::pair<Token, size_t> nextToken();
+    // std::pair<Token, size_t> peekToken();
+
+    std::string_view getPrevString()
+    {
+        return prevString;
+    }
 
 private:
     std::string_view text;
     size_t textLocation;
 
-	std::string_view prevString;
+    std::string_view prevString;
 
     const char nextChar()
     {
@@ -87,7 +125,7 @@ inline constexpr auto string_view_hash(std::string_view str) -> std::size_t
     return hash;
 }
 
-static constexpr static_hashtable<std::string_view, Token, 20, string_view_hash> keywords({
+static constexpr static_hashtable<std::string_view, Token, 30, string_view_hash> keywords({
     { "load", Token::Load },
     { "store", Token::Store },
     { "add", Token::Add },
@@ -120,25 +158,106 @@ std::pair<Token, size_t> Lexer::nextToken()
     size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
         while (isAlphaNum(c = nextChar())) { }
-		
-		prevString = std::string_view{text.data()+startLocation, textLocation};
 
-		auto result = keywords.get(prevString);
-		// result will be 0 or Token::Label if not found
-		return std::pair(result, startLocation);
+        prevString = std::string_view { text.data() + startLocation, textLocation };
+
+        auto result = keywords.get(prevString);
+        // result will be 0 or Token::Label if not found
+        return std::pair(result, startLocation);
     }
 
-	if (isNum(c)) {
-		if (c == 0) {
-			c = nextChar();
-			if (c == 'x') {}
-		}
+    if (isNum(c)) {
+        if (c == 0) {
+            c = nextChar();
+            if (c == 'x') { }
+        }
 
-		while (isNum(c = nextChar())) {}
-		prevString = std::string_view{text.data()+startLocation, textLocation};
+        while (isNum(c = nextChar())) { }
+        prevString = std::string_view { text.data() + startLocation, textLocation };
 
-		return std::pair(Token::Number, startLocation);
-	}
+        return std::pair(Token::Number, startLocation);
+    }
 
-	return std::pair(Token::Eof, 0);
+    if (c == ',') {
+        return std::pair(Token::Comma, startLocation);
+    }
+
+    return std::pair(Token::Unknown, startLocation);
+}
+
+// std::pair<Token, size_t> Lexer::peekToken()
+// {
+//
+// }
+
+const char* assembleFromFile(const char* input)
+{
+    Lexer lex(input);
+
+    std::unordered_map<std::string_view, Word> labels;
+    std::deque<InstructionData> instructions;
+
+    std::pair<Token, std::size_t> token = { Token::Unknown, 0 };
+    while (token.first != Token::Eof) {
+        token = lex.nextToken();
+        Word pos = 0;
+
+        if (token.first == Token::Label) {
+            token = lex.nextToken();
+
+            if (token.first == Token::Comma) {
+                labels[lex.getPrevString()] = pos;
+            } else {
+                throw std::runtime_error(fmt::format("label missing comma {}", lex.getPrevString()));
+            }
+            token = lex.nextToken();
+        }
+
+        if (tokenIsInstruction(token.first)) {
+            // get literal or label
+            auto operands = lex.nextToken();
+
+            // assert its either a literal or label
+            if (operands.first == Token::Label) {
+                instructions.push_back(InstructionData {
+                    .instr = tokenToInstruction(token.first),
+                    .dataType = DataType::Identifier,
+                    .identifier = lex.getPrevString() });
+                pos++;
+
+            } else if (operands.first == Token::Number) {
+                auto prevString = lex.getPrevString();
+                Word value;
+                (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+                if (value > maxOpcodeSize()) {
+                    throw std::runtime_error("operand outside of max word range (2^12)");
+                }
+                instructions.push_back({
+                    .instr = tokenToInstruction(token.first),
+                    .dataType = DataType::Opcode,
+                    .literal = value,
+                });
+                pos++;
+            } else {
+                throw std::runtime_error(fmt::format("invalid operand {}", lex.getPrevString()));
+            }
+        } else if (token.first == Token::Number) {
+            auto prevString = lex.getPrevString();
+            Word value;
+            (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+            instructions.push_back({
+                .dataType = DataType::Word,
+                .literal = value,
+            });
+        } else {
+            throw std::runtime_error("unexpected token");
+        }
+    }
+
+    return nullptr;
+}
+
+const char* assembleFromText(const char* input)
+{
+    return nullptr;
 }
