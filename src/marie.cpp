@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <fmt/core.h>
-#include <tuple>
 
 #include "instructions.h"
 
@@ -93,7 +92,7 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
         halt = true;
         break;
     case Instruction::Skipcond:
-		skipNext = skipCond(instr.second);
+        skipNext = skipCond(instr.second);
         break;
     case Instruction::Jump:
         PC = instr.second;

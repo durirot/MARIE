@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include <vector>
 
-const char* assembleFromFile(const char* input);
-const char* assembleFromText(const char* input);
+std::vector<Word> assembleFromFile(char* input);
+std::vector<Word> assembleFromText(char* input);
