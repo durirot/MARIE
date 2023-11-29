@@ -18,8 +18,9 @@ int main(int argc, char** argv)
         std::ofstream file;
         file.open(argv[2]);
         for (Word value : values) {
-            file << value;
-            fmt::print("{:x}\n", value);
+            file.write(((char*)&value) + 1, 1);
+            file.write((char*)&value, 1);
+            // fmt::print("{:x}\n", value);
         }
         file.close();
     } catch (std::runtime_error error) {

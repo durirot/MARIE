@@ -79,7 +79,6 @@ struct Lexer {
     Lexer(std::string_view text);
 
     std::pair<Token, size_t> nextToken();
-    // std::pair<Token, size_t> peekToken();
 
     std::string_view getPrevString()
     {
@@ -139,7 +138,7 @@ inline constexpr auto string_view_hash(std::string_view str) -> std::size_t
     return hash;
 }
 
-static constexpr static_hashtable<std::string_view, Token, 30, string_view_hash> keywords({
+static constinit static_hashtable<std::string_view, Token, 30, string_view_hash> keywords({
     { "load", Token::Load },
     { "store", Token::Store },
     { "add", Token::Add },
@@ -173,7 +172,7 @@ std::pair<Token, size_t> Lexer::nextToken()
     if (isAlpha(c)) {
         // fmt::print("{} is alpha\n", c);
         c = nextChar();
-        while (isAlpha(c)) {
+        while (isAlphaNum(c)) {
             // fmt::print("{} is alpha\n", c);
             c = nextChar();
         }
@@ -204,7 +203,7 @@ std::pair<Token, size_t> Lexer::nextToken()
             }
         } else {
             throw std::runtime_error(fmt::format("expected a hexidecimal value (0), instead got {}", c));
-        }
+		}
         size_t startLocation = textLocation - 1;
 
         if (!isNum(c)) {
@@ -260,6 +259,7 @@ std::vector<Word> assembleFromText(const char* input)
     std::unordered_map<std::string_view, Word> labels;
     std::deque<InstructionData> instructions;
 
+	// pass 1
     std::pair<Token, std::size_t> token = { Token::Unknown, 0 };
     Word pos = 0;
     while (true) {
@@ -335,6 +335,8 @@ std::vector<Word> assembleFromText(const char* input)
                 lex.getLine(token.second), (int)token.first));
         }
     }
+
+	// pass 2
     std::vector<Word> binaryInstructions;
     binaryInstructions.reserve(instructions.size());
 
