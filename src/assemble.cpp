@@ -177,14 +177,28 @@ std::pair<Token, size_t> Lexer::nextToken()
     }
 
     if (isNum(c)) {
-        if (c == 0) {
+        // fmt::print("{} expected to be 0\n", c);
+        if (c == '0') {
+            // fmt::print("{} is 0\n", c);
             c = nextChar();
+            // fmt::print("{} expected to be x\n", c);
             if (c == 'x') {
+                // fmt::print("{} is x\n", c);
                 c = nextChar();
+            } else {
+                throw std::runtime_error(fmt::format("expected a hexidecimal value (x), instead got {}", c));
             }
+        } else {
+            throw std::runtime_error(fmt::format("expected a hexidecimal value (0), instead got {}", c));
+        }
+        size_t startLocation = textLocation - 1;
+
+        if (!isNum(c)) {
+            throw std::runtime_error(fmt::format("expected a number after 0x instead got {}", c));
         }
 
         while (isNum(c)) {
+            // fmt::print("{} is num\n", c);
             c = nextChar();
         }
         if (textLocation < text.size()) {
@@ -192,13 +206,13 @@ std::pair<Token, size_t> Lexer::nextToken()
         }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
-        fmt::print("returning number {}\n", prevString);
+        // fmt::print("returning number {}\n", prevString);
 
         return std::pair(Token::Number, startLocation);
     }
 
     if (c == ',') {
-        fmt::print("returning comma\n");
+        // fmt::print("returning comma\n");
         return std::pair(Token::Comma, startLocation);
     }
 
@@ -214,6 +228,8 @@ std::vector<Word> assembleFromFile(const char* input)
     fseek(file, 0, SEEK_SET);
 
     char* data = (char*)malloc(size * sizeof(char));
+    fread(data, 1, size, file);
+    fclose(file);
 
     auto result = assembleFromText(data);
     free(data);
@@ -236,6 +252,7 @@ std::vector<Word> assembleFromText(const char* input)
         }
 
         if (token.first == Token::Label) {
+            auto errorString = lex.getPrevString();
             token = lex.nextToken();
             // fmt::print("{}\n", (int)token.first);
             // fmt::print("{}\n\n", lex.getPrevString());
@@ -243,7 +260,7 @@ std::vector<Word> assembleFromText(const char* input)
             if (token.first == Token::Comma) {
                 labels[lex.getPrevString()] = pos;
             } else {
-                throw std::runtime_error(fmt::format("label missing comma {}", lex.getPrevString()));
+                throw std::runtime_error(fmt::format("label missing comma {}", errorString));
             }
             token = lex.nextToken();
         }
@@ -263,7 +280,7 @@ std::vector<Word> assembleFromText(const char* input)
                 auto prevString = lex.getPrevString();
                 Word value;
                 (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
-                if (value > maxAddressSize()) {
+                if (value >= maxAddressSize()) {
                     throw std::runtime_error("operand outside of max word range (2^12)");
                 }
                 instructions.push_back({

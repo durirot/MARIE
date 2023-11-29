@@ -2,29 +2,27 @@
 #include "assemble.h"
 
 #include <fmt/core.h>
+#include <fstream>
 
 int main(int argc, char** argv)
 {
-    // if (argc < 2) {
-    // 	fmt::print("Expected at least two arguments:\nUsage marievm <file>\n");
-    // 	return -1;
-    // }
+    if (argc < 3) {
+        fmt::print("Expected at least 3 arguments:\nUsage {} <file> <output>\n", argv[0]);
+        return -1;
+    }
 
- //    const char* text(R"(
-	// 	test, load 5 
-	// 	store test
-	// )");
-
-    const char* text("test, load 5 store test");
+    // const char* text("test, load 0x5\nstore test");
 
     try {
-        std::vector<Word> values = assembleFromText(text);
+        std::vector<Word> values = assembleFromFile(argv[1]);
+        std::ofstream file;
+        file.open(argv[2]);
         for (Word value : values) {
-            fmt::print("#x{:x}\n", value);
+            file << value;
+            fmt::print("{:x}\n", value);
         }
+        file.close();
     } catch (std::runtime_error error) {
         fmt::print("{}\n", error.what());
     }
-
-    // return marieLoad(argv[2]);
 }
