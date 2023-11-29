@@ -10,11 +10,15 @@ int main(int argc, char** argv)
     // 	return -1;
     // }
 
+ //    const char* text(R"(
+	// 	test, load 5 
+	// 	store test
+	// )");
+
+    const char* text("test, load 5 store test");
+
     try {
-        std::vector<Word> values = assembleFromText(R"(
-			test, load 5
-			store test
-		)");
+        std::vector<Word> values = assembleFromText(text);
         for (Word value : values) {
             fmt::print("#x{:x}\n", value);
         }

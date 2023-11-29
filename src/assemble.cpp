@@ -157,17 +157,22 @@ std::pair<Token, size_t> Lexer::nextToken()
 
     size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
+        // fmt::print("{} is alpha\n", c);
         c = nextChar();
         while (isAlpha(c)) {
+            // fmt::print("{} is alpha\n", c);
             c = nextChar();
         }
-        textLocation -= 1;
+        // fmt::print("{} is not alpha\n", c);
+        if (textLocation < text.size()) {
+            textLocation -= 1;
+        }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
-        fmt::print("prev string [{}]\n", prevString);
+        // fmt::print("prev string [{}]\n", prevString);
 
         auto result = keywords.get(prevString);
-        // result will be 0 or Token::Label if not found
+        // result will be 0 (aka Token::Label) if not found
         return std::pair(result, startLocation);
     }
 
@@ -182,7 +187,9 @@ std::pair<Token, size_t> Lexer::nextToken()
         while (isNum(c)) {
             c = nextChar();
         }
-        textLocation -= 1;
+        if (textLocation < text.size()) {
+            textLocation -= 1;
+        }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
         fmt::print("returning number {}\n", prevString);
@@ -199,7 +206,7 @@ std::pair<Token, size_t> Lexer::nextToken()
     // return std::pair(Token::Unknown, startLocation);
 }
 
-std::vector<Word> assembleFromFile(char* input)
+std::vector<Word> assembleFromFile(const char* input)
 {
     FILE* file = fopen(input, "r");
     fseek(file, 0, SEEK_END);
@@ -208,10 +215,12 @@ std::vector<Word> assembleFromFile(char* input)
 
     char* data = (char*)malloc(size * sizeof(char));
 
-    return assembleFromText(data);
+    auto result = assembleFromText(data);
+    free(data);
+    return result;
 }
 
-std::vector<Word> assembleFromText(char* input)
+std::vector<Word> assembleFromText(const char* input)
 {
     Lexer lex(input);
 
@@ -279,8 +288,6 @@ std::vector<Word> assembleFromText(char* input)
             throw std::runtime_error(fmt::format("[parser error] unexpected token {}", (int)token.first));
         }
     }
-
-    free(input);
 
     std::vector<Word> binaryInstructions;
     binaryInstructions.reserve(instructions.size());
