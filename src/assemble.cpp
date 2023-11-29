@@ -129,7 +129,7 @@ private:
     }
 };
 
-inline constexpr auto string_view_hash(std::string_view str) -> std::size_t
+constexpr auto string_view_hash(std::string_view str) -> std::size_t
 {
     std::size_t hash = 0;
     for (auto c : str) {
@@ -167,6 +167,14 @@ std::pair<Token, size_t> Lexer::nextToken()
     if (c == '\0') {
         return std::pair(Token::Eof, textLocation);
     }
+
+	if (c == ';') {
+		c = nextChar();
+		while (c != '\n' && c != '\0') {
+			c = nextChar();
+		}
+		c = nextChar();
+	}
 
     size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
