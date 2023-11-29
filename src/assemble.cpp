@@ -70,6 +70,11 @@ Instruction tokenToInstruction(Token tok)
     return (Instruction)((int)tok - offset);
 }
 
+bool tokenHasZeroOperands(Token tok)
+{
+    return ((int)tok >= (int)Token::Input && (int)tok <= (int)Token::Halt);
+}
+
 struct Lexer {
     Lexer(std::string_view text);
 
@@ -79,6 +84,15 @@ struct Lexer {
     std::string_view getPrevString()
     {
         return prevString;
+    }
+
+    std::string_view getLine(size_t textLocation)
+    {
+        size_t start = textLocation;
+        while (textLocation < text.size() && text[textLocation] != '\n' && text[textLocation] != '\0') {
+            textLocation++;
+        }
+        return std::string_view { text.data() + start, text.data() + textLocation };
     }
 
 private:
@@ -228,6 +242,9 @@ std::vector<Word> assembleFromFile(const char* input)
     fseek(file, 0, SEEK_SET);
 
     char* data = (char*)malloc(size * sizeof(char));
+	if (data == nullptr) {
+		throw std::runtime_error("failed to allocate memory??? how!");
+	}
     fread(data, 1, size, file);
     fclose(file);
 
@@ -253,6 +270,7 @@ std::vector<Word> assembleFromText(const char* input)
 
         if (token.first == Token::Label) {
             auto errorString = lex.getPrevString();
+            auto errorLocation = token.second;
             token = lex.nextToken();
             // fmt::print("{}\n", (int)token.first);
             // fmt::print("{}\n\n", lex.getPrevString());
@@ -260,37 +278,48 @@ std::vector<Word> assembleFromText(const char* input)
             if (token.first == Token::Comma) {
                 labels[lex.getPrevString()] = pos;
             } else {
-                throw std::runtime_error(fmt::format("label missing comma {}", errorString));
+                throw std::runtime_error(fmt::format("on:\n{}\nlabel missing comma {}", lex.getLine(errorLocation), errorString));
             }
             token = lex.nextToken();
         }
 
         if (tokenIsInstruction(token.first)) {
-            // get literal or label
-            auto operands = lex.nextToken();
-
-            // assert its either a literal or label
-            if (operands.first == Token::Label) {
+            if (tokenHasZeroOperands(token.first)) {
+                // fmt::print("token has zero operands\n");
                 instructions.push_back(InstructionData {
                     .instr = tokenToInstruction(token.first),
-                    .dataType = DataType::Identifier,
-                    .identifier = lex.getPrevString() });
-                pos++;
-            } else if (operands.first == Token::Number) {
-                auto prevString = lex.getPrevString();
-                Word value;
-                (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
-                if (value >= maxAddressSize()) {
-                    throw std::runtime_error("operand outside of max word range (2^12)");
-                }
-                instructions.push_back({
-                    .instr = tokenToInstruction(token.first),
                     .dataType = DataType::Literal,
-                    .literal = value,
-                });
+                    .literal = 0 });
                 pos++;
             } else {
-                throw std::runtime_error(fmt::format("invalid operand {}", lex.getPrevString()));
+                // get literal or label
+                auto operands = lex.nextToken();
+
+                // assert its either a literal or label
+                if (operands.first == Token::Label) {
+                    instructions.push_back(InstructionData {
+                        .instr = tokenToInstruction(token.first),
+                        .dataType = DataType::Identifier,
+                        .identifier = lex.getPrevString() });
+                    pos++;
+                } else if (operands.first == Token::Number) {
+                    auto prevString = lex.getPrevString();
+                    Word value;
+                    (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+                    if (value >= maxAddressSize()) {
+                        throw std::runtime_error(fmt::format("[parser error] on:\n{}\noperand outside of max word range (2^12)",
+                            lex.getLine(operands.second)));
+                    }
+                    instructions.push_back({
+                        .instr = tokenToInstruction(token.first),
+                        .dataType = DataType::Literal,
+                        .literal = value,
+                    });
+                    pos++;
+                } else {
+                    throw std::runtime_error(fmt::format("[parser error] on:\n{}\ninvalid operand {}",
+                        lex.getLine(operands.second), lex.getPrevString()));
+                }
             }
         } else if (token.first == Token::Number) {
             auto prevString = lex.getPrevString();
@@ -302,10 +331,10 @@ std::vector<Word> assembleFromText(const char* input)
             });
             pos++;
         } else {
-            throw std::runtime_error(fmt::format("[parser error] unexpected token {}", (int)token.first));
+            throw std::runtime_error(fmt::format("[parser error] on:\n{}\n unexpected token {}",
+                lex.getLine(token.second), (int)token.first));
         }
     }
-
     std::vector<Word> binaryInstructions;
     binaryInstructions.reserve(instructions.size());
 
