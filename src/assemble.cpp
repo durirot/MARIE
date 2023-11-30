@@ -7,10 +7,20 @@
 #include <cstddef>
 #include <deque>
 #include <fmt/core.h>
+#include <map>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+namespace {
+
+bool hasErrors = false;
+void reportError(std::string error)
+{
+    fmt::print("{}\n", error);
+    hasErrors = true;
+}
 
 enum struct DataType {
     Identifier,
@@ -29,6 +39,7 @@ constexpr Word maxAddressSize()
 struct InstructionData {
     Instruction instr;
     DataType dataType;
+    std::size_t textLocation;
     union {
         std::string_view identifier;
         Word literal;
@@ -37,7 +48,8 @@ struct InstructionData {
 
 enum struct Token {
     Label,
-    Number,
+    DecNumber,
+    HexNumber,
 
     Load,
     Store,
@@ -55,6 +67,44 @@ enum struct Token {
     Eof,
 };
 
+const char* tokenToString(Token tok)
+{
+    switch (tok) {
+    case Token::Label:
+        return "Token::Label";
+    case Token::DecNumber:
+        return "Token::DecNumber";
+    case Token::HexNumber:
+        return "Token::HexNumber";
+    case Token::Load:
+        return "Token::Load";
+    case Token::Store:
+        return "Token::Store";
+    case Token::Add:
+        return "Token::Add";
+    case Token::Subt:
+        return "Token::Subt";
+    case Token::Input:
+        return "Token::Input";
+    case Token::Output:
+        return "Token::Output";
+    case Token::Halt:
+        return "Token::Halt";
+    case Token::Skipcond:
+        return "Token::Skipcond";
+    case Token::Jump:
+        return "Token::Jump";
+    case Token::Comma:
+        return "Token::Comma";
+    case Token::Unknown:
+        return "Token::Unknown";
+    case Token::Eof:
+        return "Token::Eof";
+    default:
+        return "Unknown Token";
+    }
+}
+
 bool tokenIsInstruction(Token tok)
 {
     return ((int)tok >= (int)Token::Load && (int)tok <= (int)Token::Jump);
@@ -62,8 +112,9 @@ bool tokenIsInstruction(Token tok)
 
 Instruction tokenToInstruction(Token tok)
 {
-    if (!tokenIsInstruction(tok))
-        throw std::runtime_error("token is not an instruction");
+    if (!tokenIsInstruction(tok)) {
+        reportError(fmt::format("token {} is not an instruction", tokenToString(tok)));
+    }
 
     constexpr int offset = (int)Token::Load - (int)Instruction::Load;
 
@@ -77,56 +128,40 @@ bool tokenHasZeroOperands(Token tok)
 
 struct Lexer {
     Lexer(std::string_view text);
+    // ~Lexer()
+    // {
+    //     fmt::print("printing out line infos\n");
+    //     for (auto& value : newLines) {
+    //         fmt::print("location: {}, line number: {}\n", value.first, value.second);
+    //     }
+    // }
 
     std::pair<Token, std::size_t> nextToken();
 
-    std::string_view getPrevString()
-    {
-        return prevString;
-    }
-
-    std::string_view getLine(std::size_t textLocation)
-    {
-        std::size_t start = textLocation;
-        while (textLocation < text.size() && text[textLocation] != '\n' && text[textLocation] != '\0') {
-            textLocation++;
-        }
-        return std::string_view { text.data() + start, text.data() + textLocation };
-    }
+    std::string_view getPrevString();
+    std::pair<std::size_t, std::string_view> getLine(std::size_t textLocation);
 
 private:
-    std::string_view text;
-    std::size_t textLocation;
+    std::string_view text {};
+    std::size_t textLocation {};
+    std::size_t lineNumber = 1;
 
-    std::string_view prevString;
+    // map of which index a new line is contained
+    // text location, line number
+    std::map<std::size_t, std::size_t> newLines {};
 
-    const char nextChar()
-    {
-        if (textLocation >= text.size()) {
-            return '\0';
-        }
-        return *(text.data() + textLocation++);
-    }
+    std::string_view prevString {};
 
-    static constexpr bool isNum(const char c)
-    {
-        return c >= '0' && c <= '9';
-    }
+    const char nextChar();
+    const char peekChar();
+    void consumeChar();
 
-    static constexpr bool isAlpha(const char c)
-    {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-    }
+    static constexpr bool isNum(const char c);
+    static constexpr bool isAlpha(const char c);
+    static constexpr bool isAlphaNum(const char c);
+    static constexpr bool isWhiteSpace(const char c);
 
-    static constexpr bool isAlphaNum(const char c)
-    {
-        return isNum(c) || isAlpha(c);
-    }
-
-    static constexpr bool isWhiteSpace(const char c)
-    {
-        return c == '\n' || c == '\r' || c == '\t' || c == ' ';
-    }
+    void consumeUntilNewline();
 };
 
 constexpr std::size_t string_view_hash(std::string_view str)
@@ -152,13 +187,16 @@ static constinit static_hashtable<std::string_view, Token, 30, string_view_hash>
 
 Lexer::Lexer(std::string_view text)
     : text(text)
-    , textLocation(0)
 {
+    // insert the first line into the map
+    newLines.insert(std::pair(0, 1));
 }
 
 std::pair<Token, std::size_t> Lexer::nextToken()
 {
-    char c = nextChar();
+    char c;
+start:
+    c = nextChar();
 
     while (isWhiteSpace(c)) {
         c = nextChar();
@@ -173,23 +211,25 @@ std::pair<Token, std::size_t> Lexer::nextToken()
         while (c != '\n' && c != '\0') {
             c = nextChar();
         }
-        c = nextChar();
+        // need to check for whitespace again
+        goto start;
     }
 
     std::size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
         // fmt::print("{} is alpha\n", c);
-        c = nextChar();
+        c = peekChar();
         while (isAlphaNum(c)) {
+            consumeChar();
             // fmt::print("{} is alpha\n", c);
-            c = nextChar();
+            c = peekChar();
         }
         // fmt::print("{} is not alpha\n", c);
-        if (textLocation < text.size()) {
-            textLocation -= 1;
-        }
+        // if (textLocation < text.size()) {
+        //     textLocation -= 1;
+        // }
 
-        prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
+        prevString = std::string_view(text.data() + startLocation, textLocation - startLocation);
         // fmt::print("prev string [{}]\n", prevString);
 
         auto result = keywords.get(prevString);
@@ -198,41 +238,148 @@ std::pair<Token, std::size_t> Lexer::nextToken()
     }
 
     if (isNum(c)) {
+        bool isHex = false;
         if (c == '0') {
-            c = nextChar();
-            if (c == 'x') {
+            const char newC = peekChar();
+            if (newC == 'x') {
+                consumeChar();
                 c = nextChar();
-            } else {
-                throw std::runtime_error(fmt::format("expected a hexidecimal value (x), instead got {}", c));
+                isHex = true;
             }
-        } else {
-            throw std::runtime_error(fmt::format("expected a hexidecimal value (0), instead got {}", c));
         }
         std::size_t startLocation = textLocation - 1;
 
         if (!isNum(c)) {
-            throw std::runtime_error(fmt::format("expected a number after 0x instead got {}", c));
+            // this has to be hex, correct me if I'm wrong
+            auto errorInfo = getLine(textLocation - 1);
+            reportError(fmt::format("on line {}\n{}\nexpected a number after 0x instead got {}",
+                errorInfo.first,
+                errorInfo.second,
+                c));
+            prevString = "0";
+            return std::pair(Token::HexNumber, startLocation);
         }
 
+        c = peekChar();
         while (isNum(c)) {
-            c = nextChar();
+            consumeChar();
+            c = peekChar();
         }
-        if (textLocation < text.size()) {
-            textLocation -= 1;
-        }
+        // if (textLocation < text.size()) {
+        //     textLocation -= 1;
+        // }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
 
-        return std::pair(Token::Number, startLocation);
+        if (isHex) {
+            return std::pair(Token::HexNumber, startLocation);
+        } else {
+            return std::pair(Token::DecNumber, startLocation);
+        }
     }
 
     if (c == ',') {
         return std::pair(Token::Comma, startLocation);
     }
 
-    throw std::runtime_error(fmt::format("[lexer error] unexpected token [{}]", int(c)));
-    // return std::pair(Token::Unknown, startLocation);
+    auto errorInfo = getLine(textLocation);
+    reportError(fmt::format("[lexer error] on line {}\n{}\nunexpected character: [{}], [{}]",
+        errorInfo.first,
+        errorInfo.second,
+        c,
+        int(c)));
+    return std::pair(Token::Unknown, startLocation);
 }
+
+std::string_view Lexer::getPrevString()
+{
+    return prevString;
+}
+
+std::pair<size_t, std::string_view> Lexer::getLine(std::size_t textLocation)
+{
+    auto itr = newLines.upper_bound(textLocation);
+    std::size_t start;
+    std::size_t lineNum;
+    itr--;
+
+    start = itr->first;
+    lineNum = itr->second;
+
+    while (textLocation < text.size() && text[textLocation] != '\n' && text[textLocation] != '\0') {
+        textLocation++;
+    }
+
+    if (textLocation < start) {
+        throw std::runtime_error("[lexer error] trying to construct a string_view with a start position after the end position, report this bug please.");
+    }
+
+    return {
+        lineNum,
+        std::string_view { text.data() + start, text.data() + textLocation }
+    };
+}
+
+const char Lexer::nextChar()
+{
+    if (textLocation >= text.size()) {
+        return '\0';
+    }
+    char c = *(text.data() + textLocation++);
+
+    if (c == '\n') {
+        lineNumber += 1;
+        newLines.insert(std::pair(textLocation, lineNumber));
+    }
+
+    return c;
+}
+
+const char Lexer::peekChar()
+{
+    if (textLocation >= text.size()) {
+        return '\0';
+    }
+    return *(text.data() + textLocation);
+}
+
+void Lexer::consumeChar()
+{
+    (void)nextChar();
+}
+
+constexpr bool Lexer::isNum(const char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+constexpr bool Lexer::isAlpha(const char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+constexpr bool Lexer::isAlphaNum(const char c)
+{
+    return isNum(c) || isAlpha(c);
+}
+
+constexpr bool Lexer::isWhiteSpace(const char c)
+{
+    return c == '\n' || c == '\r' || c == '\t' || c == ' ';
+}
+
+void Lexer::consumeUntilNewline()
+{
+    char c = nextChar();
+    while (true) {
+        if (c == '\n' || c == '\0') {
+            break;
+        }
+        c = nextChar();
+    }
+}
+
+} // anonymous namespace
 
 std::vector<Word> assembleFromFile(const char* input)
 {
@@ -277,7 +424,11 @@ std::vector<Word> assembleFromText(const char* input)
             if (token.first == Token::Comma) {
                 labels[lex.getPrevString()] = pos;
             } else {
-                throw std::runtime_error(fmt::format("on:\n{}\nlabel missing comma {}", lex.getLine(errorLocation), errorString));
+                auto errorInfo = lex.getLine(errorLocation);
+                reportError(fmt::format("on line {}:\n{}\nlabel {} missing comma",
+                    errorInfo.first,
+                    errorInfo.second,
+                    errorString));
             }
             token = lex.nextToken();
         }
@@ -288,6 +439,7 @@ std::vector<Word> assembleFromText(const char* input)
                 instructions.push_back(InstructionData {
                     .instr = tokenToInstruction(token.first),
                     .dataType = DataType::Literal,
+                    .textLocation = token.second,
                     .literal = 0 });
                 pos++;
             } else {
@@ -299,39 +451,60 @@ std::vector<Word> assembleFromText(const char* input)
                     instructions.push_back(InstructionData {
                         .instr = tokenToInstruction(token.first),
                         .dataType = DataType::Identifier,
+                        .textLocation = operands.second,
                         .identifier = lex.getPrevString() });
                     pos++;
-                } else if (operands.first == Token::Number) {
+                } else if (operands.first == Token::HexNumber || operands.first == Token::DecNumber) {
                     auto prevString = lex.getPrevString();
                     Word value;
-                    (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+                    if (operands.first == Token::HexNumber) {
+                        (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+                    } else {
+                        (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 10);
+                    }
                     if (value >= maxAddressSize()) {
-                        throw std::runtime_error(fmt::format("[parser error] on:\n{}\noperand outside of max word range (2^12)",
-                            lex.getLine(operands.second)));
+                        auto errorInfo = lex.getLine(operands.second);
+                        reportError(fmt::format("[parser error] on line {}:\n{}\noperand {} outside of max word range (2^12)",
+                            errorInfo.first,
+                            errorInfo.second,
+                            prevString));
+                        value = 0;
                     }
                     instructions.push_back({
                         .instr = tokenToInstruction(token.first),
                         .dataType = DataType::Literal,
+                        .textLocation = token.second,
                         .literal = value,
                     });
                     pos++;
                 } else {
-                    throw std::runtime_error(fmt::format("[parser error] on:\n{}\ninvalid operand {}",
-                        lex.getLine(operands.second), lex.getPrevString()));
+                    auto errorInfo = lex.getLine(operands.second);
+                    reportError(fmt::format("[parser error] on line {}:\n{}\ninvalid operand {}",
+                        errorInfo.first,
+                        errorInfo.second,
+                        lex.getPrevString()));
                 }
             }
-        } else if (token.first == Token::Number) {
+        } else if (token.first == Token::HexNumber || token.first == Token::DecNumber) {
             auto prevString = lex.getPrevString();
             Word value;
-            (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+            if (token.first == Token::HexNumber) {
+                (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
+            } else {
+                (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 10);
+            }
             instructions.push_back({
                 .dataType = DataType::Word,
+                .textLocation = token.second,
                 .literal = value,
             });
             pos++;
         } else {
-            throw std::runtime_error(fmt::format("[parser error] on:\n{}\n unexpected token {}",
-                lex.getLine(token.second), (int)token.first));
+            auto errorInfo = lex.getLine(token.second);
+            reportError(fmt::format("[parser error] on line {}:\n{}\nunexpected token \"{}\"",
+                errorInfo.first,
+                errorInfo.second,
+                tokenToString(token.first)));
         }
     }
 
@@ -348,7 +521,15 @@ std::vector<Word> assembleFromText(const char* input)
         case DataType::Identifier: {
             Word instruction = (Word)instr.instr;
             instruction = instruction << 12;
-            instruction |= (labels[instr.identifier] & 0x0fff);
+            if (labels.contains(instr.identifier)) {
+                instruction |= (labels[instr.identifier] & 0x0fff);
+            } else {
+                auto errorInfo = lex.getLine(instr.textLocation);
+                reportError(fmt::format("error on line: {}\n{}\nlabel \"{}\" does not exist",
+                    errorInfo.first,
+                    errorInfo.second,
+                    instr.identifier));
+            }
             binaryInstructions.push_back(instruction);
             break;
         }
@@ -362,6 +543,10 @@ std::vector<Word> assembleFromText(const char* input)
         default:
             throw std::runtime_error(fmt::format("cannot interpret DataType (eof or unknown) {}", (int)instr.dataType));
         }
+    }
+
+    if (hasErrors) {
+        throw std::runtime_error("parser has errors, cannot output a program");
     }
 
     return binaryInstructions;
