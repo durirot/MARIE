@@ -14,7 +14,7 @@
 
 enum struct DataType {
     Identifier,
-    Literal, // 12 bits
+    Literal,
     Word,
 };
 
@@ -65,7 +65,7 @@ Instruction tokenToInstruction(Token tok)
     if (!tokenIsInstruction(tok))
         throw std::runtime_error("token is not an instruction");
 
-    constexpr std::size_t offset = (int)Token::Load - (int)Instruction::Load;
+    constexpr int offset = (int)Token::Load - (int)Instruction::Load;
 
     return (Instruction)((int)tok - offset);
 }
@@ -78,16 +78,16 @@ bool tokenHasZeroOperands(Token tok)
 struct Lexer {
     Lexer(std::string_view text);
 
-    std::pair<Token, size_t> nextToken();
+    std::pair<Token, std::size_t> nextToken();
 
     std::string_view getPrevString()
     {
         return prevString;
     }
 
-    std::string_view getLine(size_t textLocation)
+    std::string_view getLine(std::size_t textLocation)
     {
-        size_t start = textLocation;
+        std::size_t start = textLocation;
         while (textLocation < text.size() && text[textLocation] != '\n' && text[textLocation] != '\0') {
             textLocation++;
         }
@@ -96,7 +96,7 @@ struct Lexer {
 
 private:
     std::string_view text;
-    size_t textLocation;
+    std::size_t textLocation;
 
     std::string_view prevString;
 
@@ -129,7 +129,7 @@ private:
     }
 };
 
-constexpr auto string_view_hash(std::string_view str) -> std::size_t
+constexpr std::size_t string_view_hash(std::string_view str)
 {
     std::size_t hash = 0;
     for (auto c : str) {
@@ -156,7 +156,7 @@ Lexer::Lexer(std::string_view text)
 {
 }
 
-std::pair<Token, size_t> Lexer::nextToken()
+std::pair<Token, std::size_t> Lexer::nextToken()
 {
     char c = nextChar();
 
@@ -168,15 +168,15 @@ std::pair<Token, size_t> Lexer::nextToken()
         return std::pair(Token::Eof, textLocation);
     }
 
-	if (c == ';') {
-		c = nextChar();
-		while (c != '\n' && c != '\0') {
-			c = nextChar();
-		}
-		c = nextChar();
-	}
+    if (c == ';') {
+        c = nextChar();
+        while (c != '\n' && c != '\0') {
+            c = nextChar();
+        }
+        c = nextChar();
+    }
 
-    size_t startLocation = textLocation - 1;
+    std::size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
         // fmt::print("{} is alpha\n", c);
         c = nextChar();
@@ -198,28 +198,23 @@ std::pair<Token, size_t> Lexer::nextToken()
     }
 
     if (isNum(c)) {
-        // fmt::print("{} expected to be 0\n", c);
         if (c == '0') {
-            // fmt::print("{} is 0\n", c);
             c = nextChar();
-            // fmt::print("{} expected to be x\n", c);
             if (c == 'x') {
-                // fmt::print("{} is x\n", c);
                 c = nextChar();
             } else {
                 throw std::runtime_error(fmt::format("expected a hexidecimal value (x), instead got {}", c));
             }
         } else {
             throw std::runtime_error(fmt::format("expected a hexidecimal value (0), instead got {}", c));
-		}
-        size_t startLocation = textLocation - 1;
+        }
+        std::size_t startLocation = textLocation - 1;
 
         if (!isNum(c)) {
             throw std::runtime_error(fmt::format("expected a number after 0x instead got {}", c));
         }
 
         while (isNum(c)) {
-            // fmt::print("{} is num\n", c);
             c = nextChar();
         }
         if (textLocation < text.size()) {
@@ -227,13 +222,11 @@ std::pair<Token, size_t> Lexer::nextToken()
         }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
-        // fmt::print("returning number {}\n", prevString);
 
         return std::pair(Token::Number, startLocation);
     }
 
     if (c == ',') {
-        // fmt::print("returning comma\n");
         return std::pair(Token::Comma, startLocation);
     }
 
@@ -249,9 +242,9 @@ std::vector<Word> assembleFromFile(const char* input)
     fseek(file, 0, SEEK_SET);
 
     char* data = (char*)malloc(size * sizeof(char));
-	if (data == nullptr) {
-		throw std::runtime_error("failed to allocate memory??? how!");
-	}
+    if (data == nullptr) {
+        throw std::runtime_error("failed to allocate memory??? how!");
+    }
     fread(data, 1, size, file);
     fclose(file);
 
@@ -267,7 +260,7 @@ std::vector<Word> assembleFromText(const char* input)
     std::unordered_map<std::string_view, Word> labels;
     std::deque<InstructionData> instructions;
 
-	// pass 1
+    // pass 1
     std::pair<Token, std::size_t> token = { Token::Unknown, 0 };
     Word pos = 0;
     while (true) {
@@ -280,8 +273,6 @@ std::vector<Word> assembleFromText(const char* input)
             auto errorString = lex.getPrevString();
             auto errorLocation = token.second;
             token = lex.nextToken();
-            // fmt::print("{}\n", (int)token.first);
-            // fmt::print("{}\n\n", lex.getPrevString());
 
             if (token.first == Token::Comma) {
                 labels[lex.getPrevString()] = pos;
@@ -344,7 +335,7 @@ std::vector<Word> assembleFromText(const char* input)
         }
     }
 
-	// pass 2
+    // pass 2
     std::vector<Word> binaryInstructions;
     binaryInstructions.reserve(instructions.size());
 
