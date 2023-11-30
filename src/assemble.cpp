@@ -128,13 +128,6 @@ bool tokenHasZeroOperands(Token tok)
 
 struct Lexer {
     Lexer(std::string_view text);
-    // ~Lexer()
-    // {
-    //     fmt::print("printing out line infos\n");
-    //     for (auto& value : newLines) {
-    //         fmt::print("location: {}, line number: {}\n", value.first, value.second);
-    //     }
-    // }
 
     std::pair<Token, std::size_t> nextToken();
 
@@ -279,6 +272,9 @@ start:
     }
 
     if (c == ',') {
+        return std::pair(Token::Comma, startLocation);
+    }
+    if (c == ':') {
         return std::pair(Token::Comma, startLocation);
     }
 
@@ -435,7 +431,6 @@ std::vector<Word> assembleFromText(const char* input)
 
         if (tokenIsInstruction(token.first)) {
             if (tokenHasZeroOperands(token.first)) {
-                // fmt::print("token has zero operands\n");
                 instructions.push_back(InstructionData {
                     .instr = tokenToInstruction(token.first),
                     .dataType = DataType::Literal,
