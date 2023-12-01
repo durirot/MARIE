@@ -1,6 +1,6 @@
 ; Don't mind this program, it is all nonsense
 ; comments can be made with a ";"
-store result
+Store result
 input 0x0
 ; 0x followed by a number represents hexidecimal numbers
 ; not having a 0x implies that the number is decimal
@@ -8,7 +8,7 @@ exampleLabel, store x
 ; labels are non-keywords followed by a ,
 ; labels can also be a : like in normal assembly languages
 exampleLabel2:
-input 0x0
+input 0X0
 store y
 
 load y

@@ -162,6 +162,8 @@ private:
     std::map<std::size_t, std::size_t> newLines {};
 
     std::string_view prevString {};
+    static constexpr std::size_t PrevStringLowerBufferSize = 15;
+    char prevStringLower[PrevStringLowerBufferSize];
 
     const char nextChar();
     const char peekChar();
@@ -243,7 +245,12 @@ start:
         prevString = std::string_view(text.data() + startLocation, textLocation - startLocation);
         // fmt::print("prev string [{}]\n", prevString);
 
-        auto result = keywords.get(prevString);
+        std::size_t lowerLen = std::min(prevString.length(), PrevStringLowerBufferSize);
+        for (int i = 0; i < lowerLen; i++) {
+            prevStringLower[i] = std::tolower(prevString[i]);
+        }
+
+        auto result = keywords.get(std::string_view { prevStringLower, lowerLen });
         // result will be 0 (aka Token::Label) if not found
         return std::pair(result, startLocation);
     }
@@ -252,7 +259,7 @@ start:
         bool isHex = false;
         if (c == '0') {
             const char newC = peekChar();
-            if (newC == 'x') {
+            if ((char)std::tolower(newC) == 'x') {
                 consumeChar();
                 c = nextChar();
                 isHex = true;
