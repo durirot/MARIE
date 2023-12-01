@@ -1,7 +1,8 @@
 #pragma once
 
 enum struct Instruction {
-    Load = 1,
+	Jns = 0,
+    Load,
     Store,
     Add,
     Subt,
@@ -11,4 +12,10 @@ enum struct Instruction {
     Halt,
     Skipcond,
     Jump,
+
+	Clear,
+	AddI,
+	JumpI,
+	StoreI,
+	LoadI,
 };

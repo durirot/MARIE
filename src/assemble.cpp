@@ -51,6 +51,7 @@ enum struct Token {
     DecNumber,
     HexNumber,
 
+    Jns,
     Load,
     Store,
     Add,
@@ -60,6 +61,11 @@ enum struct Token {
     Halt,
     Skipcond,
     Jump,
+    Clear,
+    AddI,
+    JumpI,
+    LoadI,
+    StoreI,
 
     Comma,
     Unknown,
@@ -76,6 +82,8 @@ const char* tokenToString(Token tok)
         return "Token::DecNumber";
     case Token::HexNumber:
         return "Token::HexNumber";
+    case Token::Jns:
+        return "Token::Jns";
     case Token::Load:
         return "Token::Load";
     case Token::Store:
@@ -94,6 +102,16 @@ const char* tokenToString(Token tok)
         return "Token::Skipcond";
     case Token::Jump:
         return "Token::Jump";
+    case Token::Clear:
+        return "Token::Clear";
+    case Token::AddI:
+        return "Token::AddI";
+    case Token::JumpI:
+        return "Token::JumpI";
+    case Token::LoadI:
+        return "Token::LoadI";
+    case Token::StoreI:
+        return "Token::StoreI";
     case Token::Comma:
         return "Token::Comma";
     case Token::Unknown:
@@ -107,7 +125,7 @@ const char* tokenToString(Token tok)
 
 bool tokenIsInstruction(Token tok)
 {
-    return ((int)tok >= (int)Token::Load && (int)tok <= (int)Token::Jump);
+    return ((int)tok >= (int)Token::Jns && (int)tok <= (int)Token::StoreI);
 }
 
 Instruction tokenToInstruction(Token tok)
@@ -116,14 +134,14 @@ Instruction tokenToInstruction(Token tok)
         reportError(fmt::format("token {} is not an instruction", tokenToString(tok)));
     }
 
-    constexpr int offset = (int)Token::Load - (int)Instruction::Load;
+    constexpr int offset = (int)Token::Jns - (int)Instruction::Jns;
 
     return (Instruction)((int)tok - offset);
 }
 
 bool tokenHasZeroOperands(Token tok)
 {
-    return ((int)tok >= (int)Token::Input && (int)tok <= (int)Token::Halt);
+    return ((int)tok >= (int)Token::Input && (int)tok <= (int)Token::Halt) || tok == Token::Clear;
 }
 
 struct Lexer {
@@ -167,6 +185,7 @@ constexpr std::size_t string_view_hash(std::string_view str)
 }
 
 static constinit static_hashtable<std::string_view, Token, 30, string_view_hash> keywords({
+    { "jns", Token::Jns },
     { "load", Token::Load },
     { "store", Token::Store },
     { "add", Token::Add },
@@ -176,6 +195,11 @@ static constinit static_hashtable<std::string_view, Token, 30, string_view_hash>
     { "halt", Token::Halt },
     { "skipcond", Token::Skipcond },
     { "jump", Token::Jump },
+    { "clear", Token::Clear },
+    { "addi", Token::AddI },
+    { "jumpi", Token::JumpI },
+    { "loadi", Token::LoadI },
+    { "storei", Token::StoreI },
 });
 
 Lexer::Lexer(std::string_view text)
@@ -210,17 +234,11 @@ start:
 
     std::size_t startLocation = textLocation - 1;
     if (isAlpha(c)) {
-        // fmt::print("{} is alpha\n", c);
         c = peekChar();
         while (isAlphaNum(c)) {
             consumeChar();
-            // fmt::print("{} is alpha\n", c);
             c = peekChar();
         }
-        // fmt::print("{} is not alpha\n", c);
-        // if (textLocation < text.size()) {
-        //     textLocation -= 1;
-        // }
 
         prevString = std::string_view(text.data() + startLocation, textLocation - startLocation);
         // fmt::print("prev string [{}]\n", prevString);
@@ -258,9 +276,6 @@ start:
             consumeChar();
             c = peekChar();
         }
-        // if (textLocation < text.size()) {
-        //     textLocation -= 1;
-        // }
 
         prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
 

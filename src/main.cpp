@@ -11,8 +11,6 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    // const char* text("test, load 0x5\nstore test");
-
     try {
         std::vector<Word> values = assembleFromFile(argv[1]);
         std::ofstream file;
