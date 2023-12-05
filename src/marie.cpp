@@ -1,11 +1,11 @@
 #include "marie.h"
 
+#include "instructions.h"
+
 #include <charconv>
 #include <cstdio>
 #include <fmt/core.h>
 #include <iostream>
-
-#include "instructions.h"
 
 struct Marie {
     Marie(Byte* image, size_t imageSize);
@@ -13,8 +13,6 @@ struct Marie {
     Word run();
     std::pair<Instruction, Word> decode(Word instr);
     void execInstr(std::pair<Instruction, Word>& instr);
-
-    static Word swapEndianness(Word value);
 
 private:
     static constexpr size_t MaxMemory = 4096 * sizeof(Word);
@@ -91,7 +89,7 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
         AC = userInputHex();
         break;
     case Instruction::Output:
-        fmt::print("{}\n", AC);
+        fmt::print("{:x}\n", AC);
         break;
     case Instruction::Halt:
         halt = true;
@@ -105,11 +103,6 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
     default:
         fmt::print("Invalid instruction {:x} at PC {}\n", (int)instr.first, PC);
     }
-}
-
-Word Marie::swapEndianness(Word value)
-{
-    return std::rotr(value, 8);
 }
 
 Word Marie::userInputHex()
@@ -179,14 +172,12 @@ Word marieLoad(const char* file)
 #define AS_WORD(data) *((Word*)data + i)
 
     for (std::size_t i = 0; i < size / 2; i++) {
-        fmt::print("before {:x}\n", AS_WORD(data));
+        // fmt::print("before {:x}\n", AS_WORD(data));
         AS_WORD(data) = std::rotr(AS_WORD(data), 8);
-        fmt::print("after {:x}\n", AS_WORD(data));
+        // fmt::print("after {:x}\n", AS_WORD(data));
     }
 
 #undef AS_WORD
-
-    std::getc(stdin);
 
     Marie vm(data, size);
 
