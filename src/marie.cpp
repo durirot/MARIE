@@ -171,7 +171,7 @@ bool Marie::skipCond(Word condition)
     return false;
 }
 
-Word marieLoad(const char* file)
+Word marieExecute(const char* file)
 {
     FILE* handle = fopen(file, "rb");
     if (handle == nullptr) {

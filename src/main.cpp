@@ -1,5 +1,5 @@
-#include "marie.h"
 #include "assemble.h"
+#include "marie.h"
 
 #include <fmt/core.h>
 
@@ -10,7 +10,9 @@ int main(int argc, char** argv)
         return -1;
     }
 
-	assemble(argv[1], argv[2]);
-	marieLoad(argv[2]);
+    if (assemble(argv[1], argv[2]) != 0) {
+        return -2;
+    }
 
+    return marieExecute(argv[2]);
 }

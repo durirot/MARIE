@@ -2,4 +2,4 @@
 
 #include "common.h"
 
-Word marieLoad(const char* file);
+Word marieExecute(const char* file);
