@@ -73,6 +73,13 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
     }
 
     switch (instr.first) {
+    case Instruction::Jns: {
+		AC = PC;
+        storeAtAddress(instr.second);
+		AC = instr.second + 1;
+		PC = AC;
+        break;
+    }
     case Instruction::Load:
         AC = memoryAtAddress(instr.second);
         break;
@@ -100,8 +107,23 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
     case Instruction::Jump:
         PC = instr.second;
         break;
+    case Instruction::Clear:
+        AC = 0;
+        break;
+    case Instruction::AddI:
+        AC = AC + memoryAtAddress(memoryAtAddress(instr.second));
+        break;
+    case Instruction::JumpI:
+        PC = memoryAtAddress(instr.second) & 0x0FFF;
+        break;
+    case Instruction::LoadI:
+        AC = memoryAtAddress(memoryAtAddress(instr.second));
+        break;
+    case Instruction::StoreI:
+        storeAtAddress(memoryAtAddress(instr.second));
+        break;
     default:
-        fmt::print("Invalid instruction {:x} at PC {}\n", (int)instr.first, PC);
+        fmt::print("Invalid instruction {:x} at PC {:x}\n", (int)instr.first, PC);
     }
 }
 
