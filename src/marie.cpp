@@ -1,9 +1,11 @@
 #include "marie.h"
 
+#include "instructions.h"
+
+#include <charconv>
 #include <cstdio>
 #include <fmt/core.h>
-
-#include "instructions.h"
+#include <iostream>
 
 struct Marie {
     Marie(Byte* image, size_t imageSize);
@@ -17,16 +19,17 @@ private:
     Byte memory[MaxMemory] {};
 
     Word AC {}; // Accumulator
-    // Word MAR {}; // Memory Address Register
-    // Word MBR {}; // Memory Buffer Register
+    Word MAR {}; // Memory Address Register
+    Word MBR {}; // Memory Buffer Register
     Word PC {}; // Program Counter
-    // Word IR {}; // Instruction Register (holds the next expression to be executed)
-    // Word InREG {}; //  Input Register (holds data from the input device)
+    Word IR {}; // Instruction Register (holds the next expression to be executed)
+    Word InREG {}; //  Input Register (holds data from the input device)
 
     bool skipNext = false;
     bool errors = false;
     bool halt = false;
 
+    Word userInputHex();
     Word memoryAtAddress(Word address);
     void storeAtAddress(Word address);
     bool skipCond(Word condition);
@@ -43,9 +46,9 @@ Marie::Marie(Byte* image, size_t imageSize)
 
 Word Marie::run()
 {
-    PC = memoryAtAddress(0);
+    PC = 0;
 
-    while (halt != true) {
+    while (halt != true && PC < 10) {
         auto instr = decode(memoryAtAddress(PC));
         PC += 1;
         execInstr(instr);
@@ -58,7 +61,7 @@ std::pair<Instruction, Word> Marie::decode(Word instr)
 {
     std::pair<Instruction, Word> val;
     val.first = (Instruction)(instr >> 12 & 0xF);
-    val.second = (Word)(instr & 0xFFF0);
+    val.second = (Word)(instr & 0x0FFF);
     return val;
 }
 
@@ -83,10 +86,10 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
         AC = AC - memoryAtAddress(instr.second);
         break;
     case Instruction::Input:
-        AC = getchar();
+        AC = userInputHex();
         break;
     case Instruction::Output:
-        fmt::print("{}", AC);
+        fmt::print("{:x}\n", AC);
         break;
     case Instruction::Halt:
         halt = true;
@@ -98,26 +101,37 @@ void Marie::execInstr(std::pair<Instruction, Word>& instr)
         PC = instr.second;
         break;
     default:
-        fmt::print("Invalid instruction {}", (int)instr.first);
+        fmt::print("Invalid instruction {:x} at PC {}\n", (int)instr.first, PC);
     }
+}
+
+Word Marie::userInputHex()
+{
+    std::string line;
+    std::getline(std::cin, line);
+
+    Word value;
+    std::from_chars(line.data(), line.data() + line.length(), value, 16);
+
+    return value;
 }
 
 Word Marie::memoryAtAddress(Word address)
 {
-    if (address < MaxMemory) {
-        fmt::print("attempting to address outside of memory, returning 0\n");
+    if (address >= MaxMemory) {
+        fmt::print("attempting to address outside of memory at {:x}, returning 0\n", address);
         return 0;
     }
-    return *(memory + (address * sizeof(Word)));
+    return *(((Word*)memory) + address);
 }
 
 void Marie::storeAtAddress(Word address)
 {
-    if (address < MaxMemory) {
+    if (address >= MaxMemory) {
         fmt::print("attempting to address outside of memory, doing nothing\n");
         return;
     }
-    *(memory + (address * sizeof(Word))) = AC;
+    *(((Word*)memory) + address) = AC;
 }
 
 bool Marie::skipCond(Word condition)
@@ -143,7 +157,7 @@ Word marieLoad(const char* file)
         return -1;
     }
     fseek(handle, 0, SEEK_END);
-    size_t size = ftell(handle);
+    std::size_t size = ftell(handle);
     fseek(handle, 0, SEEK_SET);
 
     Byte* data = (Byte*)malloc(size * sizeof(Byte));
@@ -154,6 +168,16 @@ Word marieLoad(const char* file)
 
     (void)fread(data, size, 1, handle);
     (void)fclose(handle);
+
+#define AS_WORD(data) *((Word*)data + i)
+
+    for (std::size_t i = 0; i < size / 2; i++) {
+        // fmt::print("before {:x}\n", AS_WORD(data));
+        AS_WORD(data) = std::rotr(AS_WORD(data), 8);
+        // fmt::print("after {:x}\n", AS_WORD(data));
+    }
+
+#undef AS_WORD
 
     Marie vm(data, size);
 

@@ -1,8 +1,7 @@
-// #include "marie.h"
-#include "assemble.hpp"
+#include "marie.h"
+#include "assemble.h"
 
 #include <fmt/core.h>
-#include <fstream>
 
 int main(int argc, char** argv)
 {
@@ -11,17 +10,7 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    try {
-        std::vector<Word> values = assembleFromFile(argv[1]);
-        std::ofstream file;
-        file.open(argv[2]);
-        for (Word value : values) {
-            file.write(((char*)&value) + 1, 1);
-            file.write((char*)&value, 1);
-            // fmt::print("{:x}\n", value);
-        }
-        file.close();
-    } catch (std::runtime_error error) {
-        fmt::print("{}\n", error.what());
-    }
+	assemble(argv[1], argv[2]);
+	marieLoad(argv[2]);
+
 }

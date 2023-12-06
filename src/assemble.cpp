@@ -1,5 +1,6 @@
-#include "assemble.hpp"
+#include "assemble.h"
 
+#include "common.h"
 #include "instructions.h"
 #include "static_hashtable.hpp"
 
@@ -14,6 +15,9 @@
 #include <vector>
 
 namespace {
+
+std::vector<Word> assembleFromFile(const char* input);
+std::vector<Word> assembleFromText(const char* input);
 
 bool hasErrors = false;
 void reportError(std::string error)
@@ -241,6 +245,7 @@ start:
             consumeChar();
             c = peekChar();
         }
+        // fmt::print("{} is not alpha\n", c);
 
         prevString = std::string_view(text.data() + startLocation, textLocation - startLocation);
         // fmt::print("prev string [{}]\n", prevString);
@@ -397,11 +402,12 @@ void Lexer::consumeUntilNewline()
     }
 }
 
-} // anonymous namespace
-
 std::vector<Word> assembleFromFile(const char* input)
 {
     FILE* file = fopen(input, "r");
+    if (file == nullptr) {
+        throw std::runtime_error(fmt::format("cannot open input file, {}", input));
+    }
     fseek(file, 0, SEEK_END);
     std::size_t size = ftell(file);
     fseek(file, 0, SEEK_SET);
@@ -415,6 +421,7 @@ std::vector<Word> assembleFromFile(const char* input)
 
     auto result = assembleFromText(data);
     free(data);
+
     return result;
 }
 
@@ -567,4 +574,28 @@ std::vector<Word> assembleFromText(const char* input)
     }
 
     return binaryInstructions;
+}
+
+} // anonymous namespace
+
+int assemble(const char* input, const char* output)
+{
+    try {
+        FILE* file = fopen(output, "wb");
+        if (file == nullptr) {
+            throw std::runtime_error(fmt::format("cannot open output file, {}", output));
+        }
+        std::vector<Word> values = assembleFromFile(input);
+
+        for (Word value : values) {
+            value = std::rotr(value, 8);
+            fwrite(&value, 2, 1, file);
+        }
+        fclose(file);
+
+        return 0;
+    } catch (std::runtime_error error) {
+        fmt::print("{}\n", error.what());
+        return 1;
+    }
 }
