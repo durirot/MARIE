@@ -24,6 +24,7 @@ int main(int argc, char** argv)
                 i++;
                 output = argv[i];
             } else {
+				fmt::print("no output file given after \"-o\"\n");
                 invalid = true;
             }
         } else if (strcmp(argv[i], "exec-bin") == 0) {
@@ -35,10 +36,6 @@ int main(int argc, char** argv)
         } else {
             input = argv[i];
         }
-    }
-
-    if (operation == None) {
-        invalid = true;
     }
 
     if (invalid) {
