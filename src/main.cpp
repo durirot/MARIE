@@ -13,7 +13,7 @@ enum Operation {
 
 int invalidArgs(char** argv)
 {
-	fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin\n", argv[0]);
+    fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin\n", argv[0]);
     return -1;
 }
 
