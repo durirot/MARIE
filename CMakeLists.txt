@@ -9,10 +9,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")
 project(marievm)
 add_executable(${PROJECT_NAME} src/main.cpp src/marie.cpp src/assemble.cpp)
 
-set_target_properties(${PROJECT_NAME} PROPERTIES
-	COMPILE_OPTIONS -fsanitize=address
-	LINK_OPTIONS -fsanitize=address
-)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug") 
+	set_target_properties(${PROJECT_NAME} PROPERTIES
+		COMPILE_OPTIONS -fsanitize=address
+		LINK_OPTIONS -fsanitize=address
+	)
+endif()
 
 include(cmake/CPM.cmake)
 

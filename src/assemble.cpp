@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <deque>
 #include <fmt/core.h>
-#include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string_view>
@@ -178,7 +177,7 @@ private:
     static constexpr bool isAlphaNum(const char c);
     static constexpr bool isWhiteSpace(const char c);
 
-    void consumeUntilNewline();
+    // void consumeUntilNewline();
 };
 
 constexpr std::size_t string_view_hash(std::string_view str)
@@ -391,16 +390,16 @@ constexpr bool Lexer::isWhiteSpace(const char c)
     return c == '\n' || c == '\r' || c == '\t' || c == ' ';
 }
 
-void Lexer::consumeUntilNewline()
-{
-    char c = nextChar();
-    while (true) {
-        if (c == '\n' || c == '\0') {
-            break;
-        }
-        c = nextChar();
-    }
-}
+// void Lexer::consumeUntilNewline()
+// {
+//     char c = nextChar();
+//     while (true) {
+//         if (c == '\n' || c == '\0') {
+//             break;
+//         }
+//         c = nextChar();
+//     }
+// }
 
 Vector assembleFromFile(const char* input)
 {
@@ -615,10 +614,27 @@ int assemble(const char* input, const char* output)
     }
 }
 
-int assembleToVec(const char* input, Vector* output)
+int assembleToVec(const char* input, const char* outputFile, Vector* output)
 {
     try {
-        *output = assembleFromFile(input);
+        if (outputFile != nullptr) {
+            FILE* file = fopen(outputFile, "wb");
+            if (file == nullptr) {
+                throw std::runtime_error(fmt::format("cannot open output file, {}", outputFile));
+            }
+
+            Vector values = assembleFromFile(input);
+            for (std::size_t i = 0; i < values.size; i++) {
+                Word value = values.buffer[i];
+                value = std::rotr(value, 8);
+                fwrite(&value, 2, 1, file);
+            }
+            fclose(file);
+
+            *output = values;
+        } else {
+            *output = assembleFromFile(input);
+        }
         return 0;
     } catch (std::runtime_error& error) {
         fmt::print("{}\n", error.what());

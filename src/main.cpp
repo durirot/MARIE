@@ -64,7 +64,7 @@ int main(int argc, char** argv)
                 goto invalid;
             }
             Vector program;
-            if (assembleToVec(input, &program) != 0) {
+            if (assembleToVec(input, output, &program) != 0) {
                 return 1;
             }
             return marieExecuteVec(&program);
