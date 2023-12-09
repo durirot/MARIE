@@ -21,7 +21,7 @@ enum struct Instruction {
     Unknown,
 };
 
-constexpr const char* InstructionToString(Instruction instr)
+inline const char* InstructionToString(Instruction instr)
 {
     switch (instr) {
     case Instruction::Jns:
@@ -56,7 +56,7 @@ constexpr const char* InstructionToString(Instruction instr)
         return "LoadI";
     case Instruction::Unknown:
         return "Unknown";
-	default:
-		return "Invalid instruction";
+    default:
+        return "Invalid instruction";
     }
 }
