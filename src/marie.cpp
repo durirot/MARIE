@@ -24,15 +24,16 @@ constexpr Level LogLevel = Level::Debug;
 } // anonymous namespace
 
 struct Marie {
-    Marie(Byte* image, size_t imageSize);
+    Marie(Word* image, size_t imageSize);
 
     Word run();
     std::pair<Instruction, Word> decode(Word instr);
     void execInstr(std::pair<Instruction, Word>& instr);
 
 private:
-    static constexpr size_t MaxMemory = 4096 * sizeof(Word);
-    Byte memory[MaxMemory] {};
+    static constexpr std::size_t MaxMemory = 4096;
+    Word memory[MaxMemory] {};
+	std::size_t imageSize {};
 
     Word AC {}; // Accumulator
     // Word MAR {}; // Memory Address Register
@@ -51,20 +52,21 @@ private:
     bool skipCond(Word condition);
 };
 
-Marie::Marie(Byte* image, size_t imageSize)
+Marie::Marie(Word* image, size_t imageSize)
+	: imageSize(imageSize)
 {
     if (imageSize > MaxMemory) {
         fmt::print("Warning, an image size of {} is larger than MARIE's max memory of {} Bytes\n", imageSize, MaxMemory);
         imageSize = MaxMemory;
     }
-    memcpy(memory, image, imageSize * sizeof(Byte));
+    memcpy(memory, image, imageSize * sizeof(Word));
 }
 
 Word Marie::run()
 {
     PC = 0;
 
-    while (halt != true && PC < 10) {
+    while (halt != true && PC < imageSize) {
         auto instr = decode(memoryAtAddress(PC));
         PC += 1;
         execInstr(instr);
@@ -158,20 +160,22 @@ Word Marie::userInputHex()
 
 Word Marie::memoryAtAddress(Word address)
 {
-    if (address >= MaxMemory) {
-        fmt::print("attempting to address outside of memory at {:x}, returning 0\n", address);
+    if (address >= imageSize) {
+        fmt::print("attempting to address outside of memory at {:x}, returning 0 and halting\n", address);
+		halt = true;
         return 0;
     }
-    return *(((Word*)memory) + address);
+    return *(memory + address);
 }
 
 void Marie::storeAtAddress(Word address)
 {
-    if (address >= MaxMemory) {
-        fmt::print("attempting to address outside of memory, doing nothing\n");
+    if (address >= imageSize) {
+        fmt::print("attempting to address outside of memory, doing nothing and halting\n");
+		halt = true;
         return;
     }
-    *(((Word*)memory) + address) = AC;
+    *(memory + address) = AC;
 }
 
 bool Marie::skipCond(Word condition)
@@ -197,30 +201,23 @@ Word marieExecute(const char* file)
         return -1;
     }
     fseek(handle, 0, SEEK_END);
-    std::size_t size = ftell(handle);
+    std::size_t size = ftell(handle) / (sizeof(Word)/sizeof(Byte));
     fseek(handle, 0, SEEK_SET);
 
-    Byte* data = (Byte*)malloc(size * sizeof(Byte));
+    Word* data = (Word*)malloc(size * sizeof(Word));
     if (data == nullptr) {
         fmt::print("Failed to allocate memory for file {}\n", file);
         return -2;
     }
 
-    (void)fread(data, size, 1, handle);
+    (void)fread(data, size, 2, handle);
     (void)fclose(handle);
 
-#define AS_WORD(data) *((Word*)data + i)
-
-    for (std::size_t i = 0; i < size / 2; i++) {
-        // fmt::print("before {:x}\n", AS_WORD(data));
-        AS_WORD(data) = std::rotr(AS_WORD(data), 8);
-        // fmt::print("after {:x}\n", AS_WORD(data));
+    for (std::size_t i = 0; i < size; i++) {
+        *(data + i) = std::rotr(*(data + i), 8);
     }
 
-#undef AS_WORD
-
     Marie vm(data, size);
-
     Word result = vm.run();
 
     free(data);
@@ -229,7 +226,7 @@ Word marieExecute(const char* file)
 
 Word marieExecuteVec(Vector* program)
 {
-    Marie vm((Byte*)program->buffer, program->size);
+    Marie vm(program->buffer, program->size);
     Word result = vm.run();
 
     free(program->buffer);
