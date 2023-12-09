@@ -14,7 +14,7 @@ enum Level {
     Debug,
     Trace,
 };
-constexpr Level LogLevel = Level::Debug;
+constexpr Level LogLevel = Level::None;
 
 #define Log(requiredLevel, ...)                          \
     if constexpr ((int)LogLevel >= (int)requiredLevel) { \
