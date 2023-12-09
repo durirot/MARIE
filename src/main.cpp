@@ -11,6 +11,12 @@ enum Operation {
     Assemble,
 };
 
+int invalidArgs(char** argv)
+{
+	fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin\n", argv[0]);
+    return -1;
+}
+
 int main(int argc, char** argv)
 {
     bool invalid = false;
@@ -24,7 +30,7 @@ int main(int argc, char** argv)
                 i++;
                 output = argv[i];
             } else {
-				fmt::print("no output file given after \"-o\"\n");
+                fmt::print("no output file given after \"-o\"\n");
                 invalid = true;
             }
         } else if (strcmp(argv[i], "exec-bin") == 0) {
@@ -39,26 +45,24 @@ int main(int argc, char** argv)
     }
 
     if (invalid) {
-    invalid:
-        fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin\n", argv[0]);
-        return -1;
+        return invalidArgs(argv);
     } else {
         switch (operation) {
         case Assemble: {
             if (input == nullptr) {
                 fmt::print("No inputs given\n");
-                goto invalid;
+                return invalidArgs(argv);
             }
             if (output == nullptr) {
                 fmt::print("No outputs given\n");
-                goto invalid;
+                return invalidArgs(argv);
             }
             return assemble(input, output);
         } // Assemble
         case Execfile: {
             if (input == nullptr) {
                 fmt::print("No inputs given\n");
-                goto invalid;
+                return invalidArgs(argv);
             }
             Vector program;
             if (assembleToVec(input, output, &program) != 0) {
@@ -71,7 +75,7 @@ int main(int argc, char** argv)
         } // Execbin
         default:
             fmt::print("No operation given\n");
-            goto invalid;
+            return invalidArgs(argv);
         }
     }
 
