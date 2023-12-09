@@ -8,16 +8,16 @@
 #include <cstddef>
 #include <deque>
 #include <fmt/core.h>
+#include <iterator>
 #include <map>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
-#include <vector>
 
 namespace {
 
-std::vector<Word> assembleFromFile(const char* input);
-std::vector<Word> assembleFromText(const char* input);
+Vector assembleFromFile(const char* input);
+Vector assembleFromText(const char* input, std::size_t size);
 
 bool hasErrors = false;
 void reportError(std::string error)
@@ -169,8 +169,8 @@ private:
     static constexpr std::size_t PrevStringLowerBufferSize = 15;
     char prevStringLower[PrevStringLowerBufferSize];
 
-    const char nextChar();
-    const char peekChar();
+    char nextChar();
+    char peekChar();
     void consumeChar();
 
     static constexpr bool isNum(const char c);
@@ -251,7 +251,7 @@ start:
         // fmt::print("prev string [{}]\n", prevString);
 
         std::size_t lowerLen = std::min(prevString.length(), PrevStringLowerBufferSize);
-        for (int i = 0; i < lowerLen; i++) {
+        for (std::size_t i = 0; i < lowerLen; i++) {
             prevStringLower[i] = std::tolower(prevString[i]);
         }
 
@@ -343,7 +343,7 @@ std::pair<size_t, std::string_view> Lexer::getLine(std::size_t textLocation)
     };
 }
 
-const char Lexer::nextChar()
+char Lexer::nextChar()
 {
     if (textLocation >= text.size()) {
         return '\0';
@@ -358,7 +358,7 @@ const char Lexer::nextChar()
     return c;
 }
 
-const char Lexer::peekChar()
+char Lexer::peekChar()
 {
     if (textLocation >= text.size()) {
         return '\0';
@@ -402,32 +402,33 @@ void Lexer::consumeUntilNewline()
     }
 }
 
-std::vector<Word> assembleFromFile(const char* input)
+Vector assembleFromFile(const char* input)
 {
     FILE* file = fopen(input, "r");
     if (file == nullptr) {
         throw std::runtime_error(fmt::format("cannot open input file, {}", input));
     }
     fseek(file, 0, SEEK_END);
-    std::size_t size = ftell(file);
+    std::size_t size = ftell(file) + 1;
     fseek(file, 0, SEEK_SET);
 
     char* data = (char*)malloc(size * sizeof(char));
     if (data == nullptr) {
         throw std::runtime_error("failed to allocate memory??? how!");
     }
-    fread(data, 1, size, file);
+    fread(data, 1, size - 1, file);
+    data[size - 1] = 0;
     fclose(file);
 
-    auto result = assembleFromText(data);
+    auto result = assembleFromText(data, size - 1);
     free(data);
 
     return result;
 }
 
-std::vector<Word> assembleFromText(const char* input)
+Vector assembleFromText(const char* input, std::size_t size)
 {
-    Lexer lex(input);
+    Lexer lex({ input, size });
 
     std::unordered_map<std::string_view, Word> labels;
     std::deque<InstructionData> instructions;
@@ -517,7 +518,8 @@ std::vector<Word> assembleFromText(const char* input)
             } else {
                 (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 10);
             }
-            instructions.push_back({
+            instructions.push_back(InstructionData {
+                .instr = Instruction::Unknown,
                 .dataType = DataType::Word,
                 .textLocation = token.second,
                 .literal = value,
@@ -533,13 +535,22 @@ std::vector<Word> assembleFromText(const char* input)
     }
 
     // pass 2
-    std::vector<Word> binaryInstructions;
-    binaryInstructions.reserve(instructions.size());
+    // std::vector<Word> binaryInstructions;
+    // binaryInstructions.reserve(instructions.size());
+    Vector binaryInstructions {};
+    binaryInstructions.size = instructions.size();
+    binaryInstructions.buffer = (Word*)malloc(instructions.size() * sizeof(Word));
+    std::size_t binaryInstructionCount = 0;
+
+    auto pushBack = [&](Word word) {
+        binaryInstructions.buffer[binaryInstructionCount++] = word;
+    };
 
     for (auto& instr : instructions) {
         switch (instr.dataType) {
         case DataType::Word: {
-            binaryInstructions.push_back(instr.literal);
+            pushBack(instr.literal);
+            // binaryInstructions.push_back(instr.literal);
             break;
         }
         case DataType::Identifier: {
@@ -554,14 +565,16 @@ std::vector<Word> assembleFromText(const char* input)
                     errorInfo.second,
                     instr.identifier));
             }
-            binaryInstructions.push_back(instruction);
+            pushBack(instruction);
+            // binaryInstructions.push_back(instruction);
             break;
         }
         case DataType::Literal: {
             Word instruction = (Word)instr.instr;
             instruction = instruction << 12;
             instruction |= (instr.literal & 0x0fff);
-            binaryInstructions.push_back(instruction);
+            pushBack(instruction);
+            // binaryInstructions.push_back(instruction);
             break;
         }
         default:
@@ -585,16 +598,29 @@ int assemble(const char* input, const char* output)
         if (file == nullptr) {
             throw std::runtime_error(fmt::format("cannot open output file, {}", output));
         }
-        std::vector<Word> values = assembleFromFile(input);
+        Vector values = assembleFromFile(input);
 
-        for (Word value : values) {
+        for (std::size_t i = 0; i < values.size; i++) {
+            Word value = values.buffer[i];
             value = std::rotr(value, 8);
             fwrite(&value, 2, 1, file);
         }
         fclose(file);
+        free(values.buffer);
 
         return 0;
-    } catch (std::runtime_error error) {
+    } catch (std::runtime_error& error) {
+        fmt::print("{}\n", error.what());
+        return 1;
+    }
+}
+
+int assembleToVec(const char* input, Vector* output)
+{
+    try {
+        *output = assembleFromFile(input);
+        return 0;
+    } catch (std::runtime_error& error) {
         fmt::print("{}\n", error.what());
         return 1;
     }

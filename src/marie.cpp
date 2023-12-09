@@ -7,6 +7,22 @@
 #include <fmt/core.h>
 #include <iostream>
 
+namespace {
+
+enum Level {
+    None,
+    Debug,
+    Trace,
+};
+constexpr Level LogLevel = Level::Debug;
+
+#define Log(requiredLevel, ...)                          \
+    if constexpr ((int)LogLevel >= (int)requiredLevel) { \
+        fmt::print(__VA_ARGS__);                         \
+    }
+
+} // anonymous namespace
+
 struct Marie {
     Marie(Byte* image, size_t imageSize);
 
@@ -19,14 +35,14 @@ private:
     Byte memory[MaxMemory] {};
 
     Word AC {}; // Accumulator
-    Word MAR {}; // Memory Address Register
-    Word MBR {}; // Memory Buffer Register
+    // Word MAR {}; // Memory Address Register
+    // Word MBR {}; // Memory Buffer Register
     Word PC {}; // Program Counter
-    Word IR {}; // Instruction Register (holds the next expression to be executed)
-    Word InREG {}; //  Input Register (holds data from the input device)
+    // Word IR {}; // Instruction Register (holds the next expression to be executed)
+    // Word InREG {}; //  Input Register (holds data from the input device)
 
     bool skipNext = false;
-    bool errors = false;
+    // bool errors = false;
     bool halt = false;
 
     Word userInputHex();
@@ -68,16 +84,18 @@ std::pair<Instruction, Word> Marie::decode(Word instr)
 void Marie::execInstr(std::pair<Instruction, Word>& instr)
 {
     if (skipNext) {
+        Log(Debug, "skipping instruction\n");
         skipNext = false;
         return;
     }
 
+    Log(Debug, "executing instruction {}\n", InstructionToString(instr.first));
     switch (instr.first) {
     case Instruction::Jns: {
-		AC = PC;
+        AC = PC;
         storeAtAddress(instr.second);
-		AC = instr.second + 1;
-		PC = AC;
+        AC = instr.second + 1;
+        PC = AC;
         break;
     }
     case Instruction::Load:
@@ -160,11 +178,11 @@ bool Marie::skipCond(Word condition)
 {
     condition = condition & 0x0C00;
 
-    if (condition == 0x0000 && AC < 0) {
+    if (condition == 0x0000 && (int16_t)AC < 0) {
         return true;
-    } else if (condition == 0x0400 && AC == 0) {
+    } else if (condition == 0x0400 && (int16_t)AC == 0) {
         return true;
-    } else if (condition == 0x0800 && AC > 0) {
+    } else if (condition == 0x0800 && (int16_t)AC > 0) {
         return true;
     }
 
@@ -206,5 +224,14 @@ Word marieExecute(const char* file)
     Word result = vm.run();
 
     free(data);
+    return result;
+}
+
+Word marieExecuteVec(Vector* program)
+{
+    Marie vm((Byte*)program->buffer, program->size);
+    Word result = vm.run();
+
+    free(program->buffer);
     return result;
 }
