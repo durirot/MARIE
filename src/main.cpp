@@ -1,4 +1,5 @@
 #include "assemble.h"
+#include "disassemble.h"
 #include "marie.h"
 
 #include <fmt/core.h>
@@ -9,11 +10,12 @@ enum Operation {
     Execfile,
     Execbin,
     Assemble,
+    Disassemble,
 };
 
 int invalidArgs(char** argv)
 {
-    fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin\n", argv[0]);
+    fmt::print("Usage {} [command] [input] -o [output]\nCommands: assemble, exec-file, exec-bin, disassemble\n", argv[0]);
     return -1;
 }
 
@@ -39,6 +41,8 @@ int main(int argc, char** argv)
             operation = Execfile;
         } else if (strcmp(argv[i], "assemble") == 0) {
             operation = Assemble;
+        } else if (strcmp(argv[i], "disassemble") == 0) {
+            operation = Disassemble;
         } else {
             input = argv[i];
         }
@@ -71,8 +75,22 @@ int main(int argc, char** argv)
             return marieExecuteVec(&program);
         } // Exec
         case Execbin: {
+            if (input == nullptr) {
+                fmt::print("No inputs given\n");
+                return invalidArgs(argv);
+            }
             return marieExecute(input);
         } // Execbin
+        case Disassemble: {
+            if (input == nullptr) {
+                fmt::print("No inputs given\n");
+                return invalidArgs(argv);
+            }
+            if (output == nullptr) {
+				return disassembleAndPrint(input);
+            }
+			return disassembleToFile(input, output);
+        } // Disassemble
         default:
             fmt::print("No operation given\n");
             return invalidArgs(argv);
