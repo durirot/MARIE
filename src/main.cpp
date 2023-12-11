@@ -87,9 +87,9 @@ int main(int argc, char** argv)
                 return invalidArgs(argv);
             }
             if (output == nullptr) {
-				return disassembleAndPrint(input);
+                return disassembleAndPrint(input);
             }
-			return disassembleToFile(input, output);
+            return disassembleToFile(input, output);
         } // Disassemble
         default:
             fmt::print("No operation given\n");
