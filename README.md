@@ -5,9 +5,10 @@ A MARIE virtual machine
 # Usage
 
 marievm [command] [input] -o [output]
-- assemble  (assembles to an output file in big endian)
-- exec-bin  (execs a big endian binary file)
-- exec-file (execs a file that has not been assembled yet)
+- assemble    (assembles to an output file in big endian)
+- exec-bin    (execs a big endian binary file)
+- exec-file   (execs a file that has not been assembled yet)
+- disassemble (disassembles to standard out, or to a specified output file)
 
 # Building
 
