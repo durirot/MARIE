@@ -2,32 +2,26 @@
 
 #include "common.h"
 #include "instructions.h"
-#include <cstdio>
+
 #include <fmt/core.h>
+#include <fstream>
+#include <filesystem>
 
 namespace {
 
 Vector readFile(const char* inputFile)
 {
-    FILE* file = fopen(inputFile, "rb");
-    if (file == nullptr) {
-        throw std::runtime_error(fmt::format("cannot open input file, {}", inputFile));
-    }
-
-    fseek(file, 0, SEEK_END);
-    std::size_t size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    Word* data = (Word*)malloc(size * sizeof(char));
+    std::fstream file(inputFile, std::ios::in);
+    std::size_t size = std::filesystem::file_size(inputFile);
+    
+    char* data = (char*)malloc(size);
     if (data == nullptr) {
-        throw std::runtime_error("failed to allocate memory??? how!");
+        throw std::runtime_error("failed to allocate memory??? how! are you on a 8gb macbook??");
     }
+    
+    file.read(data, size);
 
-    (void)fread(data, 1, size, file);
-
-    fclose(file);
-
-    return Vector { size / 2, data };
+    return Vector { size / 2, reinterpret_cast<Word*>(data) };
 }
 
 std::pair<Instruction, Word> decodeInstruction(Word instr)
