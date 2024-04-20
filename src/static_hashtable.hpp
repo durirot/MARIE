@@ -1,8 +1,3 @@
-#include <cstdint>
-#include <concepts>
-#include <initializer_list>
-#include <array>
-
 template <typename Type, auto Hashfunc>
 concept is_hash_function = requires(Type key) {
     {
@@ -87,4 +82,3 @@ private:
     std::size_t contained = 0;
     Type default_value {};
 };
-

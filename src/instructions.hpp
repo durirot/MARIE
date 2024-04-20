@@ -1,6 +1,6 @@
 #pragma once
 
-enum struct Instruction {
+enum struct Instruction : u32 {
     Jns = 0,
     Load,
     Store,

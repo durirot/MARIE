@@ -1,22 +1,13 @@
 #include "assemble.h"
 
-#include "common.h"
-#include "instructions.h"
+#include "file.hpp"
+#include "instructions.hpp"
 #include "static_hashtable.hpp"
-
-#include <charconv>
-#include <cstddef>
-#include <deque>
-#include <fmt/core.h>
-#include <map>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
 
 namespace {
 
-Vector assembleFromFile(const char* input);
-Vector assembleFromText(const char* input, std::size_t size);
+std::vector<Word> assembleFromFile(const char* input);
+std::vector<Word> assembleFromText(const char* input, std::size_t size);
 
 bool hasErrors = false;
 void reportError(std::string error)
@@ -128,7 +119,7 @@ const char* tokenToString(Token tok)
 
 bool tokenIsInstruction(Token tok)
 {
-    return ((int)tok >= (int)Token::Jns && (int)tok <= (int)Token::StoreI);
+    return (static_cast<int>(tok) >= static_cast<int>(Token::Jns) && static_cast<int>(tok) <= static_cast<int>(Token::StoreI));
 }
 
 Instruction tokenToInstruction(Token tok)
@@ -137,18 +128,18 @@ Instruction tokenToInstruction(Token tok)
         reportError(fmt::format("token {} is not an instruction", tokenToString(tok)));
     }
 
-    constexpr int offset = (int)Token::Jns - (int)Instruction::Jns;
+    constexpr int offset = static_cast<int>(Token::Jns) - static_cast<int>(Instruction::Jns);
 
-    return (Instruction)((int)tok - offset);
+    return static_cast<Instruction>(static_cast<int>(tok) - offset);
 }
 
 bool tokenHasZeroOperands(Token tok)
 {
-    return ((int)tok >= (int)Token::Input && (int)tok <= (int)Token::Halt) || tok == Token::Clear;
+    return (static_cast<int>(tok) >= static_cast<int>(Token::Input) && static_cast<int>(tok) <= static_cast<int>(Token::Halt)) || tok == Token::Clear;
 }
 
 struct Lexer {
-    Lexer(std::string_view text);
+    explicit Lexer(const std::string_view text);
 
     std::pair<Token, std::size_t> nextToken();
 
@@ -156,17 +147,17 @@ struct Lexer {
     std::pair<std::size_t, std::string_view> getLine(std::size_t textLocation);
 
 private:
-    std::string_view text {};
-    std::size_t textLocation {};
-    std::size_t lineNumber = 1;
+    std::string_view mText {};
+    std::size_t mTextLocation {};
+    std::size_t mLineNumber = 1;
 
     // map of which index a new line is contained
     // text location, line number
-    std::map<std::size_t, std::size_t> newLines {};
+    std::map<std::size_t, std::size_t> mNewLines {};
 
-    std::string_view prevString {};
+    std::string_view mPrevString {};
     static constexpr std::size_t PrevStringLowerBufferSize = 15;
-    char prevStringLower[PrevStringLowerBufferSize];
+    std::array<char, PrevStringLowerBufferSize> mPrevStringLower;
 
     char nextChar();
     char peekChar();
@@ -184,7 +175,7 @@ constexpr std::size_t string_view_hash(std::string_view str)
 {
     std::size_t hash = 0;
     for (auto c : str) {
-        hash = c + (hash << 6) + (hash << 16) - hash;
+        hash = static_cast<std::size_t>(c) + (hash << 6) + (hash << 16) - hash;
     }
     return hash;
 }
@@ -208,10 +199,10 @@ static constinit static_hashtable<std::string_view, Token, 30, string_view_hash>
 });
 
 Lexer::Lexer(std::string_view text)
-    : text(text)
+    : mText(text)
 {
     // insert the first line into the map
-    newLines.insert(std::pair(0, 1));
+    mNewLines.insert(std::pair(0, 1));
 }
 
 std::pair<Token, std::size_t> Lexer::nextToken()
@@ -225,7 +216,7 @@ start:
     }
 
     if (c == '\0') {
-        return std::pair(Token::Eof, textLocation);
+        return { Token::Eof, mTextLocation };
     }
 
     if (c == ';') {
@@ -237,7 +228,7 @@ start:
         goto start;
     }
 
-    std::size_t startLocation = textLocation - 1;
+    std::size_t startLocation = mTextLocation - 1;
     if (isAlpha(c)) {
         c = peekChar();
         while (isAlphaNum(c)) {
@@ -246,40 +237,40 @@ start:
         }
         // fmt::print("{} is not alpha\n", c);
 
-        prevString = std::string_view(text.data() + startLocation, textLocation - startLocation);
+        mPrevString = std::string_view(mText.data() + startLocation, mTextLocation - startLocation);
         // fmt::print("prev string [{}]\n", prevString);
 
-        std::size_t lowerLen = std::min(prevString.length(), PrevStringLowerBufferSize);
+        std::size_t lowerLen = std::min(mPrevString.length(), PrevStringLowerBufferSize);
         for (std::size_t i = 0; i < lowerLen; i++) {
-            prevStringLower[i] = std::tolower(prevString[i]);
+            mPrevStringLower[i] = static_cast<char>(std::tolower(mPrevString[i]));
         }
 
-        auto result = keywords.get(std::string_view { prevStringLower, lowerLen });
+        auto result = keywords.get(std::string_view { mPrevStringLower.data(), lowerLen });
         // result will be 0 (aka Token::Label) if not found
-        return std::pair(result, startLocation);
+        return { result, startLocation };
     }
 
     if (isNum(c)) {
         bool isHex = false;
         if (c == '0') {
             const char newC = peekChar();
-            if ((char)std::tolower(newC) == 'x') {
+            if (static_cast<char>(std::tolower(newC)) == 'x') {
                 consumeChar();
                 c = nextChar();
                 isHex = true;
             }
         }
-        std::size_t startLocation = textLocation - 1;
+        startLocation = mTextLocation - 1;
 
         if (!isNum(c)) {
             // this has to be hex, correct me if I'm wrong
-            auto errorInfo = getLine(textLocation - 1);
+            auto errorInfo = getLine(mTextLocation - 1);
             reportError(fmt::format("on line {}\n{}\nexpected a number after 0x instead got {}",
                 errorInfo.first,
                 errorInfo.second,
                 c));
-            prevString = "0";
-            return std::pair(Token::HexNumber, startLocation);
+            mPrevString = "0";
+            return { Token::HexNumber, startLocation };
         }
 
         c = peekChar();
@@ -288,47 +279,48 @@ start:
             c = peekChar();
         }
 
-        prevString = std::string_view { text.data() + startLocation, text.data() + textLocation };
+        mPrevString = std::string_view { mText.data() + startLocation, mText.data() + mTextLocation };
 
         if (isHex) {
-            return std::pair(Token::HexNumber, startLocation);
+            return { Token::HexNumber, startLocation };
         } else {
-            return std::pair(Token::DecNumber, startLocation);
+            return { Token::DecNumber, startLocation };
         }
     }
 
     if (c == ',') {
-        return std::pair(Token::Comma, startLocation);
+        return { Token::Comma, startLocation };
     }
     if (c == ':') {
-        return std::pair(Token::Comma, startLocation);
+        return { Token::Comma, startLocation };
     }
 
-    auto errorInfo = getLine(textLocation);
+    auto errorInfo = getLine(mTextLocation);
     reportError(fmt::format("[lexer error] on line {}\n{}\nunexpected character: [{}], [{}]",
         errorInfo.first,
         errorInfo.second,
         c,
         int(c)));
-    return std::pair(Token::Unknown, startLocation);
+
+    return { Token::Unknown, startLocation };
 }
 
 std::string_view Lexer::getPrevString()
 {
-    return prevString;
+    return mPrevString;
 }
 
 std::pair<size_t, std::string_view> Lexer::getLine(std::size_t textLocation)
 {
-    auto itr = newLines.upper_bound(textLocation);
-    std::size_t start;
-    std::size_t lineNum;
+    auto itr = mNewLines.upper_bound(textLocation);
+    std::size_t start {};
+    std::size_t lineNum {};
     itr--;
 
     start = itr->first;
     lineNum = itr->second;
 
-    while (textLocation < text.size() && text[textLocation] != '\n' && text[textLocation] != '\0') {
+    while (textLocation < mText.size() && mText[textLocation] != '\n' && mText[textLocation] != '\0') {
         textLocation++;
     }
 
@@ -338,20 +330,20 @@ std::pair<size_t, std::string_view> Lexer::getLine(std::size_t textLocation)
 
     return {
         lineNum,
-        std::string_view { text.data() + start, text.data() + textLocation }
+        std::string_view { mText.data() + start, mText.data() + textLocation }
     };
 }
 
 char Lexer::nextChar()
 {
-    if (textLocation >= text.size()) {
+    if (mTextLocation >= mText.size()) {
         return '\0';
     }
-    char c = *(text.data() + textLocation++);
+    char c = *(mText.data() + mTextLocation++);
 
     if (c == '\n') {
-        lineNumber += 1;
-        newLines.insert(std::pair(textLocation, lineNumber));
+        mLineNumber += 1;
+        mNewLines.insert(std::pair(mTextLocation, mLineNumber));
     }
 
     return c;
@@ -359,10 +351,10 @@ char Lexer::nextChar()
 
 char Lexer::peekChar()
 {
-    if (textLocation >= text.size()) {
+    if (mTextLocation >= mText.size()) {
         return '\0';
     }
-    return *(text.data() + textLocation);
+    return *(mText.data() + mTextLocation);
 }
 
 void Lexer::consumeChar()
@@ -401,31 +393,15 @@ constexpr bool Lexer::isWhiteSpace(const char c)
 //     }
 // }
 
-Vector assembleFromFile(const char* input)
+std::vector<Word> assembleFromFile(const char* input)
 {
-    FILE* file = fopen(input, "r");
-    if (file == nullptr) {
-        throw std::runtime_error(fmt::format("cannot open input file, {}", input));
-    }
-    fseek(file, 0, SEEK_END);
-    std::size_t size = ftell(file) + 1;
-    fseek(file, 0, SEEK_SET);
+    std::vector<char> data = fileToVector<char>(input);
+    data.emplace_back('\0');
 
-    char* data = (char*)malloc(size * sizeof(char));
-    if (data == nullptr) {
-        throw std::runtime_error("failed to allocate memory??? how!");
-    }
-    fread(data, 1, size - 1, file);
-    data[size - 1] = 0;
-    fclose(file);
-
-    auto result = assembleFromText(data, size - 1);
-    free(data);
-
-    return result;
+    return assembleFromText(data.data(), data.size());
 }
 
-Vector assembleFromText(const char* input, std::size_t size)
+std::vector<Word> assembleFromText(const char* input, std::size_t size)
 {
     Lexer lex({ input, size });
 
@@ -480,7 +456,7 @@ Vector assembleFromText(const char* input, std::size_t size)
                     pos++;
                 } else if (operands.first == Token::HexNumber || operands.first == Token::DecNumber) {
                     auto prevString = lex.getPrevString();
-                    Word value;
+                    Word value {};
                     if (operands.first == Token::HexNumber) {
                         (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
                     } else {
@@ -511,7 +487,7 @@ Vector assembleFromText(const char* input, std::size_t size)
             }
         } else if (token.first == Token::HexNumber || token.first == Token::DecNumber) {
             auto prevString = lex.getPrevString();
-            Word value;
+            Word value {};
             if (token.first == Token::HexNumber) {
                 (void)std::from_chars(prevString.data(), prevString.data() + prevString.length(), value, 16);
             } else {
@@ -534,27 +510,29 @@ Vector assembleFromText(const char* input, std::size_t size)
     }
 
     // pass 2
-    // std::vector<Word> binaryInstructions;
-    // binaryInstructions.reserve(instructions.size());
-    Vector binaryInstructions {};
-    binaryInstructions.size = instructions.size();
-    binaryInstructions.buffer = (Word*)malloc(instructions.size() * sizeof(Word));
-    std::size_t binaryInstructionCount = 0;
+    // Vector binaryInstructions {};
+    // binaryInstructions.size = instructions.size();
+    // binaryInstructions.buffer = (Word*)malloc(instructions.size() * sizeof(Word));
 
-    auto pushBack = [&](Word word) {
-        binaryInstructions.buffer[binaryInstructionCount++] = word;
-    };
+    std::vector<Word> binaryInstructions;
+    binaryInstructions.reserve(instructions.size());
+    // std::size_t binaryInstructionCount = 0;
+
+    // auto pushBack = [&](Word word) {
+    //     binaryInstructions[binaryInstructionCount++] = word;
+    // };
 
     for (auto& instr : instructions) {
         switch (instr.dataType) {
         case DataType::Word: {
-            pushBack(instr.literal);
-            // binaryInstructions.push_back(instr.literal);
+            // pushBack(instr.literal);
+            binaryInstructions.push_back(instr.literal);
             break;
         }
         case DataType::Identifier: {
-            Word instruction = (Word)instr.instr;
-            instruction = instruction << 12;
+            constexpr Word shift = 12U;
+            Word instruction = static_cast<Word>(static_cast<Word>(instr.instr) << shift);
+            // instruction = instruction << 12;
             if (labels.contains(instr.identifier)) {
                 instruction |= (labels[instr.identifier] & 0x0fff);
             } else {
@@ -564,20 +542,20 @@ Vector assembleFromText(const char* input, std::size_t size)
                     errorInfo.second,
                     instr.identifier));
             }
-            pushBack(instruction);
-            // binaryInstructions.push_back(instruction);
+            // pushBack(instruction);
+            binaryInstructions.push_back(instruction);
             break;
         }
         case DataType::Literal: {
-            Word instruction = (Word)instr.instr;
-            instruction = instruction << 12;
+            constexpr Word shift = 12U;
+            Word instruction = static_cast<Word>(static_cast<Word>(instr.instr) << shift);
             instruction |= (instr.literal & 0x0fff);
-            pushBack(instruction);
-            // binaryInstructions.push_back(instruction);
+            // pushBack(instruction);
+            binaryInstructions.push_back(instruction);
             break;
         }
         default:
-            throw std::runtime_error(fmt::format("cannot interpret DataType (eof or unknown) {}", (int)instr.dataType));
+            throw std::runtime_error(fmt::format("cannot interpret DataType (eof or unknown) {}", static_cast<int>(instr.dataType)));
         }
     }
 
@@ -593,19 +571,14 @@ Vector assembleFromText(const char* input, std::size_t size)
 int assemble(const char* input, const char* output)
 {
     try {
-        FILE* file = fopen(output, "wb");
-        if (file == nullptr) {
-            throw std::runtime_error(fmt::format("cannot open output file, {}", output));
-        }
-        Vector values = assembleFromFile(input);
+        std::vector<Word> values = assembleFromFile(input);
 
-        for (std::size_t i = 0; i < values.size; i++) {
-            Word value = values.buffer[i];
+        for (auto& value : values) {
             value = std::rotr(value, 8);
-            fwrite(&value, 2, 1, file);
+            LOGT("value: {:x}", value);
         }
-        fclose(file);
-        free(values.buffer);
+
+        dataToFile(output, std::span(values));
 
         return 0;
     } catch (std::runtime_error& error) {
@@ -614,24 +587,19 @@ int assemble(const char* input, const char* output)
     }
 }
 
-int assembleToVec(const char* input, const char* outputFile, Vector* output)
+int assembleToVec(const char* input, const char* outputFile, std::vector<Word>* output)
 {
     try {
         if (outputFile != nullptr) {
-            FILE* file = fopen(outputFile, "wb");
-            if (file == nullptr) {
-                throw std::runtime_error(fmt::format("cannot open output file, {}", outputFile));
-            }
+            std::vector<Word> values = assembleFromFile(input);
 
-            Vector values = assembleFromFile(input);
-            for (std::size_t i = 0; i < values.size; i++) {
-                Word value = values.buffer[i];
+            for (auto& value : values) {
                 value = std::rotr(value, 8);
-                fwrite(&value, 2, 1, file);
             }
-            fclose(file);
 
-            *output = values;
+            dataToFile(outputFile, std::span(values));
+
+            *output = std::move(values);
         } else {
             *output = assembleFromFile(input);
         }
