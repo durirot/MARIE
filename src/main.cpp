@@ -1,6 +1,6 @@
-#include "assemble.h"
-#include "disassemble.h"
-#include "marie.h"
+#include "assemble.hpp"
+#include "disassemble.hpp"
+#include "marie.hpp"
 
 enum Operation {
     None,
