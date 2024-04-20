@@ -48,7 +48,7 @@ int disassembleAndPrint(const char* input)
         fmt::print("{}", disassembleToString(input));
         return 0;
     } catch (std::runtime_error& error) {
-        fmt::print("{}", error.what());
+        LOGE("{}", error.what());
         return 1;
     }
 }
@@ -60,7 +60,7 @@ int disassembleToFile(const char* input, const char* output)
         dataToFile(output, std::span(data));
         return 0;
     } catch (const std::runtime_error& error) {
-        fmt::print("{}", error.what());
+        LOGE("{}", error.what());
         return 1;
     }
 }
