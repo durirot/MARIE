@@ -9,7 +9,7 @@ namespace {
 bool hasErrors = false;
 void reportError(std::string error)
 {
-    fmt::print("{}\n", error);
+    LOGE("{}\n", error);
     hasErrors = true;
 }
 
@@ -474,7 +474,7 @@ void Assembler::parsePass()
                     }
                     if (value >= maxAddressSize()) {
                         auto errorInfo = lex.getLine(operands.second);
-                        reportError(fmt::format("[parser error] on line {}:\n{}\noperand {} outside of max word range (2^12)",
+                        reportError(fmt::format("on line {}:\n{}\noperand {} outside of max word range (2^12)",
                             errorInfo.first,
                             errorInfo.second,
                             prevString));
@@ -489,7 +489,7 @@ void Assembler::parsePass()
                     pos++;
                 } else {
                     auto errorInfo = lex.getLine(operands.second);
-                    reportError(fmt::format("[parser error] on line {}:\n{}\ninvalid operand {}",
+                    reportError(fmt::format("on line {}:\n{}\ninvalid operand {}",
                         errorInfo.first,
                         errorInfo.second,
                         lex.getPrevString()));
@@ -512,7 +512,7 @@ void Assembler::parsePass()
             pos++;
         } else {
             auto errorInfo = lex.getLine(token.second);
-            reportError(fmt::format("[parser error] on line {}:\n{}\nunexpected token \"{}\"",
+            reportError(fmt::format("on line {}:\n{}\nunexpected token \"{}\"",
                 errorInfo.first,
                 errorInfo.second,
                 tokenToString(token.first)));
@@ -579,8 +579,8 @@ int assemble(const char* input, const char* output)
         dataToFile(output, std::span(values));
 
         return 0;
-    } catch (std::runtime_error& error) {
-        fmt::print("{}\n", error.what());
+    } catch (const std::runtime_error& error) {
+        LOGE("{}\n", error.what());
         return 1;
     }
 }
@@ -612,7 +612,7 @@ int assembleToVec(const char* input, const char* outputFile, std::vector<Word>& 
         }
         return 0;
     } catch (const std::runtime_error& error) {
-        fmt::print("{}\n", error.what());
+        LOGE("{}\n", error.what());
         return 1;
     }
 }
