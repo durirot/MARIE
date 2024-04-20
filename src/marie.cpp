@@ -42,18 +42,21 @@ Marie::Marie(const Word* image, size_t imageSize)
         mImageSize = MaxMemory;
     }
     std::memcpy(mMemory.data(), image, mImageSize * sizeof(Word));
+    LOGD("Created a MARIE virtual machine with an imageSize of {}", mImageSize);
 }
 
 Word Marie::run()
 {
+    LOGT("run called on MARIE virtual machine")
     mPC = 0;
 
-    while (mHalt && mPC < mImageSize) {
+    while (!mHalt && mPC < mImageSize) {
         auto instr = decode(memoryAtAddress(mPC));
         mPC += 1;
         execInstr(instr);
     }
 
+    LOGD("run finished on MARIE virtual machine with mPC of {}", mPC);
     return mAC;
 }
 
