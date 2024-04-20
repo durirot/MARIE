@@ -11,7 +11,7 @@ enum Operation {
 };
 
 struct ArgParser {
-    explicit ArgParser(const std::span<char*>& args);
+    explicit ArgParser(const std::span<char*> args);
     int invalidArgs();
 
     bool invalid = false;
@@ -23,7 +23,7 @@ private:
     std::span<char*> args;
 };
 
-ArgParser::ArgParser(const std::span<char*>& args)
+ArgParser::ArgParser(const std::span<char*> args)
     : args(args)
 {
     for (std::size_t i = 1; i < args.size(); i++) {
@@ -80,7 +80,7 @@ int main(int argc, char** argv)
                 return parser.invalidArgs();
             }
             std::vector<Word> program {};
-            if (assembleToVec(parser.input, parser.output, &program) != 0) {
+            if (assembleToVec(parser.input, parser.output, program) != 0) {
                 return 1;
             }
             return marieExecuteVec(program);

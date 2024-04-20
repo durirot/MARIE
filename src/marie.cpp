@@ -204,7 +204,6 @@ Word marieExecute(const char* inputFile)
     // Convert from big to little endian
     for (Word& i : data) {
         i = std::rotr(i, 8);
-        // *(data.data() + i) = std::rotr(*(data.data() + i), 8);
     }
 
     Marie vm(data.data(), data.size());
