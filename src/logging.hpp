@@ -38,41 +38,18 @@ enum struct Level {
     }
 }
 
-static constexpr Level GlobalLevel = Level::Error;
-
-#define LOG(level, ...)                                                                           \
-    if constexpr (level >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(level), fmt::format(__VA_ARGS__)); \
-    }
+static constexpr Level GlobalLevel = Level::Trace;
 
 } // namespace Logging
 
-#define LOGT(...)                                                                                                 \
-    if constexpr (Logging::Level::Trace >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::Trace), fmt::format(__VA_ARGS__)); \
+#define LOG(level, ...)                                                                           \
+    if constexpr (level >= Logging::GlobalLevel) {                                                \
+        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(level), fmt::format(__VA_ARGS__)); \
     }
 
-#define LOGI(...)                                                                                                \
-    if constexpr (Logging::Level::Info >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::Info), fmt::format(__VA_ARGS__)); \
-    }
-
-#define LOGD(...)                                                                                                 \
-    if constexpr (Logging::Level::Debug >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::Debug), fmt::format(__VA_ARGS__)); \
-    }
-
-#define LOGW(...)                                                                                                \
-    if constexpr (Logging::Level::Warn >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::Warn), fmt::format(__VA_ARGS__)); \
-    }
-
-#define LOGE(...)                                                                                                 \
-    if constexpr (Logging::Level::Error >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::Error), fmt::format(__VA_ARGS__)); \
-    }
-
-#define LOGN(...)                                                                                                \
-    if constexpr (Logging::Level::None >= Logging::GlobalLevel) {                                                      \
-        fmt::print(stderr, "[{}] {}\n", Logging::LevelToString(Logging::Level::None), fmt::format(__VA_ARGS__)); \
-    }
+#define LOGT(...) LOG(Logging::Level::Trace, __VA_ARGS__)
+#define LOGI(...) LOG(Logging::Level::Info, __VA_ARGS__)
+#define LOGW(...) LOG(Logging::Level::Warn, __VA_ARGS__)
+#define LOGD(...) LOG(Logging::Level::Debug, __VA_ARGS__)
+#define LOGE(...) LOG(Logging::Level::Error, __VA_ARGS__)
+#define LOGN(...) LOG(Logging::Level::None, __VA_ARGS__)
