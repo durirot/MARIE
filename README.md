@@ -1,6 +1,6 @@
 # MARIE 
 
-A MARIE virtual machine
+A MARIE virtual machine, assembler and disassembler
 
 # Usage
 
